@@ -1,0 +1,9 @@
+.git
+.agents
+.codex
+.aws
+.env
+bin
+.cache
+*.log
+docs/system_design.md

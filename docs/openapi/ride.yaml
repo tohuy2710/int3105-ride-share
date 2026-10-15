@@ -1,0 +1,508 @@
+openapi: 3.0.3
+info:
+  title: Ride Service API
+  version: 0.1.0
+  description: 'API mock không lưu trạng thái, không kiểm tra tồn tại ID, không gọi
+    service khác. Identity mẫu: rider_123/driver_456; không cần token. 202 chỉ xác
+    nhận mock. GET vẫn trả fixture sau PATCH. Body tối đa 1 MiB.'
+servers:
+- url: http://localhost:8081
+paths:
+  /fare:
+    post:
+      operationId: estimateFare
+      summary: Ước tính giá và ETA
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: &id001
+              description: Request ID được echo hoặc tự sinh.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FareResponse'
+              example:
+                fareId: fare_123
+                estimatedFare: 85000
+                etaMinutes: 12
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FareRequest'
+  /rides:
+    post:
+      operationId: createRide
+      summary: Đặt chuyến đi
+      responses:
+        '201':
+          description: Mock response
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RideResponse'
+              example:
+                rideId: ride_123
+                status: REQUESTED
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRequest'
+  /rides/{rideId}:
+    get:
+      operationId: getRide
+      summary: Đọc fixture chuyến đi
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailsResponse'
+              example:
+                rideId: ride_123
+                fareId: fare_123
+                riderId: rider_123
+                status: REQUESTED
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: rideId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        description: Echo nguyên ID; không tra cứu tồn tại.
+    patch:
+      operationId: respondToRide
+      summary: ACCEPT trả ACCEPTED; DENY trả REQUESTED
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+              example:
+                rideId: ride_123
+                action: ACCEPT
+                status: ACCEPTED
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionRequest'
+      parameters:
+      - name: rideId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        description: Echo nguyên ID; không tra cứu tồn tại.
+  /rides/{rideId}/status:
+    patch:
+      operationId: updateRideStatus
+      summary: Echo trạng thái, không lưu thay đổi
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RideResponse'
+              example:
+                rideId: ride_123
+                status: COMPLETED
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusRequest'
+      parameters:
+      - name: rideId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        description: Echo nguyên ID; không tra cứu tồn tại.
+  /healthz:
+    get:
+      operationId: health
+      summary: Health check
+      responses:
+        '200':
+          description: Service đang chạy
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - service
+                - status
+                properties:
+                  service:
+                    type: string
+                    example: ride-service
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                    example: ok
+              example:
+                service: ride-service
+                status: ok
+components:
+  schemas:
+    Coordinates:
+      type: object
+      required:
+      - lat
+      - long
+      properties:
+        lat:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 21.0285
+        long:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: 105.8542
+    FareRequest:
+      type: object
+      required:
+      - pickupLocation
+      - destination
+      properties:
+        pickupLocation:
+          $ref: '#/components/schemas/Coordinates'
+        destination:
+          $ref: '#/components/schemas/Coordinates'
+    FareResponse:
+      type: object
+      required:
+      - fareId
+      - estimatedFare
+      - etaMinutes
+      properties:
+        fareId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: fare_123
+        estimatedFare:
+          type: integer
+          example: 85000
+          description: Giá mock, đơn vị VND.
+        etaMinutes:
+          type: integer
+          example: 12
+    CreateRequest:
+      type: object
+      required:
+      - fareId
+      properties:
+        fareId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: fare_123
+    RideResponse:
+      type: object
+      required:
+      - rideId
+      - status
+      properties:
+        rideId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        status:
+          type: string
+          example: REQUESTED
+    DetailsResponse:
+      type: object
+      required:
+      - rideId
+      - fareId
+      - riderId
+      - status
+      properties:
+        rideId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        fareId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: fare_123
+        riderId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: rider_123
+        status:
+          type: string
+          example: REQUESTED
+    ActionRequest:
+      type: object
+      required:
+      - action
+      properties:
+        action:
+          type: string
+          enum:
+          - ACCEPT
+          - DENY
+          example: ACCEPT
+    ActionResponse:
+      type: object
+      required:
+      - rideId
+      - action
+      - status
+      properties:
+        rideId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        action:
+          type: string
+          enum:
+          - ACCEPT
+          - DENY
+          example: ACCEPT
+        status:
+          type: string
+          enum:
+          - ACCEPTED
+          - REQUESTED
+          example: ACCEPTED
+    StatusRequest:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - ARRIVED
+          - IN_PROGRESS
+          - COMPLETED
+          example: COMPLETED
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - details
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request body
+            details:
+              type: array
+              items:
+                type: string
+              example:
+              - fareId must not be blank

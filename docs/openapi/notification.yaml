@@ -1,0 +1,180 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  version: 0.1.0
+  description: 'API mock không lưu trạng thái, không kiểm tra tồn tại ID, không gọi
+    service khác. Identity mẫu: rider_123/driver_456; không cần token. 202 chỉ xác
+    nhận mock. GET vẫn trả fixture sau PATCH. Body tối đa 1 MiB.'
+servers:
+- url: http://localhost:8084
+paths:
+  /internal/notifications/ride-requests:
+    post:
+      operationId: sendRideRequest
+      summary: Xác nhận mock, không gửi push
+      responses:
+        '202':
+          description: Mock response
+          headers:
+            X-Request-ID: &id001
+              description: Request ID được echo hoặc tự sinh.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+              example:
+                notificationId: notification_123
+                rideId: ride_123
+                driverId: driver_456
+                type: RIDE_REQUEST
+                status: QUEUED
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Request'
+  /healthz:
+    get:
+      operationId: health
+      summary: Health check
+      responses:
+        '200':
+          description: Service đang chạy
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - service
+                - status
+                properties:
+                  service:
+                    type: string
+                    example: notification-service
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                    example: ok
+              example:
+                service: notification-service
+                status: ok
+components:
+  schemas:
+    Request:
+      type: object
+      required:
+      - rideId
+      - driverId
+      - type
+      properties:
+        rideId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        driverId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: driver_456
+        type:
+          type: string
+          enum:
+          - RIDE_REQUEST
+          example: RIDE_REQUEST
+    Response:
+      type: object
+      required:
+      - notificationId
+      - rideId
+      - driverId
+      - type
+      - status
+      properties:
+        notificationId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: notification_123
+        rideId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        driverId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: driver_456
+        type:
+          type: string
+          enum:
+          - RIDE_REQUEST
+          example: RIDE_REQUEST
+        status:
+          type: string
+          enum:
+          - QUEUED
+          example: QUEUED
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - details
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request body
+            details:
+              type: array
+              items:
+                type: string
+              example:
+              - fareId must not be blank

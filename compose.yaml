@@ -1,0 +1,73 @@
+services:
+  ride:
+    build:
+      context: .
+      args:
+        SERVICE: ride
+    ports:
+      - "${RIDE_PORT:-8081}:8081"
+    environment:
+      PORT: "8081"
+      GIN_MODE: ${GIN_MODE:-release}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    stop_grace_period: 15s
+  location:
+    build:
+      context: .
+      args:
+        SERVICE: location
+    ports:
+      - "${LOCATION_PORT:-8082}:8082"
+    environment:
+      PORT: "8082"
+      GIN_MODE: ${GIN_MODE:-release}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    stop_grace_period: 15s
+  matching:
+    build:
+      context: .
+      args:
+        SERVICE: matching
+    ports:
+      - "${MATCHING_PORT:-8083}:8083"
+    environment:
+      PORT: "8083"
+      GIN_MODE: ${GIN_MODE:-release}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8083/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    stop_grace_period: 15s
+  notification:
+    build:
+      context: .
+      args:
+        SERVICE: notification
+    ports:
+      - "${NOTIFICATION_PORT:-8084}:8084"
+    environment:
+      PORT: "8084"
+      GIN_MODE: ${GIN_MODE:-release}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    stop_grace_period: 15s

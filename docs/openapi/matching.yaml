@@ -1,0 +1,205 @@
+openapi: 3.0.3
+info:
+  title: Matching Service API
+  version: 0.1.0
+  description: 'API mock không lưu trạng thái, không kiểm tra tồn tại ID, không gọi
+    service khác. Identity mẫu: rider_123/driver_456; không cần token. 202 chỉ xác
+    nhận mock. GET vẫn trả fixture sau PATCH. Body tối đa 1 MiB.'
+servers:
+- url: http://localhost:8083
+paths:
+  /internal/matching/requests:
+    post:
+      operationId: requestMatching
+      summary: Xác nhận mock, không kích hoạt matching
+      responses:
+        '202':
+          description: Mock response
+          headers:
+            X-Request-ID: &id001
+              description: Request ID được echo hoặc tự sinh.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+              example:
+                rideId: ride_123
+                status: MATCHING
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Request'
+  /internal/matching/requests/{rideId}:
+    get:
+      operationId: getMatching
+      summary: Luôn trả MATCHING cho ID hợp lệ
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+              example:
+                rideId: ride_123
+                status: MATCHING
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: rideId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        description: Echo nguyên ID; không tra cứu tồn tại.
+  /healthz:
+    get:
+      operationId: health
+      summary: Health check
+      responses:
+        '200':
+          description: Service đang chạy
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - service
+                - status
+                properties:
+                  service:
+                    type: string
+                    example: matching-service
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                    example: ok
+              example:
+                service: matching-service
+                status: ok
+components:
+  schemas:
+    Request:
+      type: object
+      required:
+      - rideId
+      properties:
+        rideId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+    Response:
+      type: object
+      required:
+      - rideId
+      - status
+      properties:
+        rideId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: ride_123
+        status:
+          type: string
+          enum:
+          - MATCHING
+          example: MATCHING
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - details
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request body
+            details:
+              type: array
+              items:
+                type: string
+              example:
+              - fareId must not be blank

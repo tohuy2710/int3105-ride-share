@@ -1,0 +1,323 @@
+openapi: 3.0.3
+info:
+  title: Location Service API
+  version: 0.1.0
+  description: 'API mock không lưu trạng thái, không kiểm tra tồn tại ID, không gọi
+    service khác. Identity mẫu: rider_123/driver_456; không cần token. 202 chỉ xác
+    nhận mock. GET vẫn trả fixture sau PATCH. Body tối đa 1 MiB.'
+servers:
+- url: http://localhost:8082
+paths:
+  /drivers/location:
+    post:
+      operationId: updateLocation
+      summary: Echo tọa độ tài xế
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: &id001
+              description: Request ID được echo hoặc tự sinh.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+              example:
+                driverId: driver_456
+                lat: 21.0285
+                long: 105.8542
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationRequest'
+  /drivers/availability:
+    patch:
+      operationId: updateAvailability
+      summary: Echo availability
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+              example:
+                driverId: driver_456
+                available: false
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilityRequest'
+  /internal/drivers/nearby:
+    get:
+      operationId: nearbyDrivers
+      summary: Trả một tài xế fixture, không tìm kiếm địa lý
+      responses:
+        '200':
+          description: Mock response
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NearbyResponse'
+              example:
+                drivers:
+                - driverId: driver_456
+                  location:
+                    lat: 21.0285
+                    long: 105.8542
+                  distanceMeters: 500
+        '400':
+          description: Input không hợp lệ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method không được hỗ trợ
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi server
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: lat
+        in: query
+        required: true
+        schema: &id002
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 21.0285
+      - name: long
+        in: query
+        required: true
+        schema: &id003
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: 105.8542
+      - name: radiusMeters
+        in: query
+        required: false
+        schema:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          default: 3000
+  /healthz:
+    get:
+      operationId: health
+      summary: Health check
+      responses:
+        '200':
+          description: Service đang chạy
+          headers:
+            X-Request-ID: *id001
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - service
+                - status
+                properties:
+                  service:
+                    type: string
+                    example: location-service
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                    example: ok
+              example:
+                service: location-service
+                status: ok
+components:
+  schemas:
+    LocationRequest: &id004
+      type: object
+      required:
+      - lat
+      - long
+      properties:
+        lat: *id002
+        long: *id003
+    LocationResponse:
+      type: object
+      required:
+      - driverId
+      - lat
+      - long
+      properties:
+        driverId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: driver_456
+        lat: *id002
+        long: *id003
+    AvailabilityRequest:
+      type: object
+      required:
+      - available
+      properties:
+        available:
+          type: boolean
+          example: false
+    AvailabilityResponse:
+      type: object
+      required:
+      - driverId
+      - available
+      properties:
+        driverId:
+          type: string
+          minLength: 1
+          pattern: \S
+          example: driver_456
+        available:
+          type: boolean
+          example: false
+    NearbyResponse:
+      type: object
+      required:
+      - drivers
+      properties:
+        drivers:
+          type: array
+          items:
+            type: object
+            required:
+            - driverId
+            - location
+            - distanceMeters
+            properties:
+              driverId:
+                type: string
+                minLength: 1
+                pattern: \S
+                example: driver_456
+              location: *id004
+              distanceMeters:
+                type: integer
+                example: 500
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - details
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request body
+            details:
+              type: array
+              items:
+                type: string
+              example:
+              - fareId must not be blank
