@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"int3105-ride-share/internal/platform/api"
+	"int3105-ride-share/internal/platform/security"
 )
 
 type Config struct {
@@ -45,6 +46,12 @@ func LoadConfig(defaultPort string) (Config, error) {
 	return cfg, nil
 }
 func Run(name, port string, register func(*gin.Engine)) error {
+	if _, err := security.FromEnv(); err != nil {
+		return err
+	}
+	if len(os.Getenv("INTERNAL_TOKEN")) < 16 {
+		return fmt.Errorf("INTERNAL_TOKEN must have at least 16 bytes")
+	}
 	cfg, err := LoadConfig(port)
 	if err != nil {
 		return err
@@ -53,6 +60,15 @@ func Run(name, port string, register func(*gin.Engine)) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.Level}))
 	router := api.NewRouter(name, logger)
 	register(router)
+	hasReadiness := false
+	for _, route := range router.Routes() {
+		if route.Method == "GET" && route.Path == "/readyz" {
+			hasReadiness = true
+		}
+	}
+	if !hasReadiness {
+		router.GET("/readyz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	}
 	server := &http.Server{Addr: net.JoinHostPort("", cfg.Port), Handler: router, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

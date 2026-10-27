@@ -7,9 +7,11 @@ import (
 
 func RegisterRoutes(r *gin.Engine, service Service) {
 	h := &Handler{service: service}
-	r.POST("/fare", api.Identity("riderId", "rider_123"), h.EstimateFare)
-	r.POST("/rides", api.Identity("riderId", "rider_123"), h.CreateRide)
-	r.GET("/rides/:rideId", api.Identity("riderId", "rider_123"), h.GetRide)
-	r.PATCH("/rides/:rideId", api.Identity("driverId", "driver_456"), h.RespondToRide)
-	r.PATCH("/rides/:rideId/status", api.Identity("driverId", "driver_456"), h.UpdateStatus)
+	r.POST("/fare", api.Auth("RIDER"), h.EstimateFare)
+	r.POST("/rides", api.Auth("RIDER"), h.CreateRide)
+	r.GET("/rides/:rideId", api.Auth(""), h.GetRide)
+	r.PATCH("/rides/:rideId", api.Auth("DRIVER"), h.RespondToRide)
+	r.PATCH("/rides/:rideId/status", api.Auth("DRIVER"), h.UpdateStatus)
+	r.DELETE("/rides/:rideId", api.Auth("RIDER"), h.CancelRide)
+	r.GET("/internal/rides/:rideId", api.Internal(), h.InternalRide)
 }

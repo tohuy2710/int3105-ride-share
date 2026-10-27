@@ -3,3 +3,5 @@
 .env
 coverage.out
 *.log
+__pycache__/
+*.pyc

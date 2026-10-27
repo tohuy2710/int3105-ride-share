@@ -4,17 +4,26 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"int3105-ride-share/internal/contracts"
 	"int3105-ride-share/internal/location"
 	"int3105-ride-share/internal/matching"
 	"int3105-ride-share/internal/notification"
 	"int3105-ride-share/internal/platform/api"
+	"int3105-ride-share/internal/platform/security"
 	"int3105-ride-share/internal/ride"
 	"io"
 	"log/slog"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 )
 
+func TestMain(m *testing.M) {
+	os.Setenv("JWT_SECRET", "test-secret-with-at-least-thirty-two-bytes")
+	os.Setenv("INTERNAL_TOKEN", "test-internal-token")
+	os.Exit(m.Run())
+}
 func router(service string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := api.NewRouter(service+"-service", slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -34,6 +43,20 @@ func request(t *testing.T, r *gin.Engine, method, path, body string, status int)
 	t.Helper()
 	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Token", "test-internal-token")
+	user := contracts.User{UserID: "rider_123", Email: "rider@example.com", Role: "RIDER"}
+	if method == "PATCH" || strings.HasPrefix(path, "/drivers/") {
+		user = contracts.User{UserID: "driver_456", Email: "driver1@example.com", Role: "DRIVER"}
+	}
+	manager, err := security.FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := manager.Issue(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("X-Request-ID", "test-request")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -57,9 +80,9 @@ func TestEndpoints(t *testing.T) {
 	}{
 		{"ride", "POST", "/fare", `{"pickupLocation":{"lat":0,"long":0},"destination":{"lat":90,"long":180}}`, 200, `{"fareId":"fare_123","estimatedFare":85000,"etaMinutes":12}`},
 		{"ride", "POST", "/rides", `{"fareId":"any-fare"}`, 201, `{"rideId":"ride_123","status":"REQUESTED"}`},
-		{"ride", "GET", "/rides/custom", "", 200, `{"rideId":"custom","fareId":"fare_123","riderId":"rider_123","status":"REQUESTED"}`},
-		{"ride", "PATCH", "/rides/custom", `{"action":"ACCEPT"}`, 200, `{"rideId":"custom","action":"ACCEPT","status":"ACCEPTED"}`},
-		{"ride", "PATCH", "/rides/custom", `{"action":"DENY"}`, 200, `{"rideId":"custom","action":"DENY","status":"REQUESTED"}`},
+		{"ride", "GET", "/rides/custom", "", 200, `{"rideId":"custom","fareId":"fare_123","riderId":"rider_123","driverId":null,"status":"REQUESTED"}`},
+		{"ride", "PATCH", "/rides/custom", `{"action":"ACCEPT"}`, 200, `{"rideId":"custom","action":"ACCEPT","driverId":"driver_456","status":"ACCEPTED"}`},
+		{"ride", "PATCH", "/rides/custom", `{"action":"DENY"}`, 200, `{"rideId":"custom","action":"DENY","driverId":null,"status":"REQUESTED"}`},
 		{"ride", "PATCH", "/rides/custom/status", `{"status":"COMPLETED"}`, 200, `{"rideId":"custom","status":"COMPLETED"}`},
 		{"location", "POST", "/drivers/location", `{"lat":0,"long":0}`, 200, `{"driverId":"driver_456","lat":0,"long":0}`},
 		{"location", "PATCH", "/drivers/availability", `{"available":false}`, 200, `{"driverId":"driver_456","available":false}`},

@@ -1,0 +1,67 @@
+{
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "rides.v1",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "matching.requests.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notification.accepted.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "matching.cancelled.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "rides.v1",
+      "vhost": "/",
+      "destination": "matching.requests.v1",
+      "destination_type": "queue",
+      "routing_key": "ride.requested.v1",
+      "arguments": {}
+    },
+    {
+      "source": "rides.v1",
+      "vhost": "/",
+      "destination": "notification.accepted.v1",
+      "destination_type": "queue",
+      "routing_key": "ride.accepted.v1",
+      "arguments": {}
+    },
+    {
+      "source": "rides.v1",
+      "vhost": "/",
+      "destination": "matching.cancelled.v1",
+      "destination_type": "queue",
+      "routing_key": "ride.cancelled.v1",
+      "arguments": {}
+    }
+  ]
+}

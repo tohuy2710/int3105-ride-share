@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ride-share.local/events/ride.accepted.v1.json",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "version",
+    "occurredAt",
+    "requestId",
+    "data"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "eventType": {
+      "const": "ride.accepted.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "rideId",
+        "driverId"
+      ],
+      "properties": {
+        "rideId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "driverId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,323 +1,447 @@
-openapi: 3.0.3
-info:
-  title: Location Service API
-  version: 0.1.0
-  description: 'API mock không lưu trạng thái, không kiểm tra tồn tại ID, không gọi
-    service khác. Identity mẫu: rider_123/driver_456; không cần token. 202 chỉ xác
-    nhận mock. GET vẫn trả fixture sau PATCH. Body tối đa 1 MiB.'
-servers:
-- url: http://localhost:8082
-paths:
-  /drivers/location:
-    post:
-      operationId: updateLocation
-      summary: Echo tọa độ tài xế
-      responses:
-        '200':
-          description: Mock response
-          headers:
-            X-Request-ID: &id001
-              description: Request ID được echo hoặc tự sinh.
-              schema:
+components:
+  schemas:
+    AvailabilityRequest:
+      additionalProperties: true
+      properties:
+        available:
+          type: boolean
+      required:
+        - available
+      type: object
+    AvailabilityResponse:
+      additionalProperties: false
+      properties:
+        available:
+          type: boolean
+        driverId:
+          minLength: 1
+          pattern: \S
+          type: string
+      required:
+        - driverId
+        - available
+      type: object
+    Coordinates:
+      additionalProperties: true
+      properties:
+        lat:
+          format: double
+          maximum: 90
+          minimum: -90
+          type: number
+        long:
+          format: double
+          maximum: 180
+          minimum: -180
+          type: number
+      required:
+        - lat
+        - long
+      type: object
+    Driver:
+      additionalProperties: false
+      properties:
+        distanceMeters:
+          minimum: 0
+          type: integer
+        driverId:
+          minLength: 1
+          pattern: \S
+          type: string
+        location:
+          $ref: '#/components/schemas/Coordinates'
+      required:
+        - driverId
+        - location
+        - distanceMeters
+      type: object
+    ErrorResponse:
+      additionalProperties: false
+      properties:
+        error:
+          additionalProperties: false
+          properties:
+            code:
+              enum:
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - RIDE_NOT_FOUND
+                - INVALID_RIDE_STATE
+                - RIDE_ALREADY_ACCEPTED
+                - ACCEPT_IN_PROGRESS
+                - DEPENDENCY_UNAVAILABLE
+                - INTERNAL_ERROR
+                - NOT_FOUND
+                - METHOD_NOT_ALLOWED
+              type: string
+            details:
+              items:
                 type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LocationResponse'
-              example:
-                driverId: driver_456
-                lat: 21.0285
-                long: 105.8542
-        '400':
-          description: Input không hợp lệ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LocationRequest'
+              type: array
+            message:
+              type: string
+          required:
+            - code
+            - message
+            - details
+          type: object
+      required:
+        - error
+      type: object
+    Health:
+      additionalProperties: false
+      properties:
+        service:
+          enum:
+            - location-service
+          type: string
+        status:
+          enum:
+            - ok
+          type: string
+      required:
+        - service
+        - status
+      type: object
+    LocationResponse:
+      additionalProperties: false
+      properties:
+        driverId:
+          minLength: 1
+          pattern: \S
+          type: string
+        lat:
+          maximum: 90
+          minimum: -90
+          type: number
+        long:
+          maximum: 180
+          minimum: -180
+          type: number
+      required:
+        - driverId
+        - lat
+        - long
+      type: object
+    NearbyResponse:
+      additionalProperties: false
+      properties:
+        drivers:
+          items:
+            $ref: '#/components/schemas/Driver'
+          type: array
+      required:
+        - drivers
+      type: object
+    Ready:
+      additionalProperties: false
+      properties:
+        postgres:
+          enum:
+            - ok
+            - unavailable
+          type: string
+        redis:
+          enum:
+            - unavailable
+          type: string
+        status:
+          enum:
+            - ok
+            - degraded
+            - unavailable
+          type: string
+      required:
+        - status
+      type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
+    internalToken:
+      in: header
+      name: X-Internal-Token
+      type: apiKey
+info:
+  description: Phase 1. JSON <= 1 MiB. Unknown input fields are ignored for compatibility. IDs are nonblank strings. Public routes use JWT; internal routes use X-Internal-Token. Only Ride persists data; Auth uses fixtures. No inter-service HTTP or AMQP wiring.
+  title: Location Service API
+  version: 1.0.0
+openapi: 3.0.3
+paths:
   /drivers/availability:
     patch:
       operationId: updateAvailability
-      summary: Echo availability
-      responses:
-        '200':
-          description: Mock response
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AvailabilityResponse'
-              example:
-                driverId: driver_456
-                available: false
-        '400':
-          description: Input không hợp lệ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AvailabilityRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'FORBIDDEN: role or ownership denied'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: 'DRIVER: echo availability; no persistence'
+  /drivers/location:
+    post:
+      operationId: updateLocation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Coordinates'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'FORBIDDEN: role or ownership denied'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: 'DRIVER: echo coordinates; no persistence'
+  /healthz:
+    get:
+      operationId: locationHealth
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security: []
+      summary: Process liveness; does not inspect dependencies
   /internal/drivers/nearby:
     get:
       operationId: nearbyDrivers
-      summary: Trả một tài xế fixture, không tìm kiếm địa lý
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            maximum: 90
+            minimum: -90
+            type: number
+        - in: query
+          name: long
+          required: true
+          schema:
+            maximum: 180
+            minimum: -180
+            type: number
+        - in: query
+          name: radiusMeters
+          required: false
+          schema:
+            default: 3000
+            exclusiveMinimum: true
+            minimum: 0
+            type: number
       responses:
-        '200':
-          description: Mock response
-          headers:
-            X-Request-ID: *id001
+        "200":
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/NearbyResponse'
               example:
                 drivers:
-                - driverId: driver_456
-                  location:
-                    lat: 21.0285
-                    long: 105.8542
-                  distanceMeters: 500
-        '400':
-          description: Input không hợp lệ
+                  - distanceMeters: 500
+                    driverId: driver_456
+                    location:
+                      lat: 21.0285
+                      long: 105.8542
+              schema:
+                $ref: '#/components/schemas/NearbyResponse'
+          description: Success
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          description: 'VALIDATION_ERROR: malformed or invalid input'
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
+          description: INTERNAL_ERROR
           headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      parameters:
-      - name: lat
-        in: query
-        required: true
-        schema: &id002
-          type: number
-          format: double
-          minimum: -90
-          maximum: 90
-          example: 21.0285
-      - name: long
-        in: query
-        required: true
-        schema: &id003
-          type: number
-          format: double
-          minimum: -180
-          maximum: 180
-          example: 105.8542
-      - name: radiusMeters
-        in: query
-        required: false
-        schema:
-          type: number
-          format: double
-          minimum: 0
-          exclusiveMinimum: true
-          default: 3000
-  /healthz:
+                type: string
+      security:
+        - internalToken: []
+      summary: 'Matching -> Location: fixed single driver, ignores coordinates and availability'
+  /readyz:
     get:
-      operationId: health
-      summary: Health check
+      operationId: locationReady
       responses:
-        '200':
-          description: Service đang chạy
-          headers:
-            X-Request-ID: *id001
+        "200":
           content:
             application/json:
               schema:
-                type: object
-                required:
-                - service
-                - status
-                properties:
-                  service:
-                    type: string
-                    example: location-service
-                  status:
-                    type: string
-                    enum:
-                    - ok
-                    example: ok
-              example:
-                service: location-service
-                status: ok
-components:
-  schemas:
-    LocationRequest: &id004
-      type: object
-      required:
-      - lat
-      - long
-      properties:
-        lat: *id002
-        long: *id003
-    LocationResponse:
-      type: object
-      required:
-      - driverId
-      - lat
-      - long
-      properties:
-        driverId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: driver_456
-        lat: *id002
-        long: *id003
-    AvailabilityRequest:
-      type: object
-      required:
-      - available
-      properties:
-        available:
-          type: boolean
-          example: false
-    AvailabilityResponse:
-      type: object
-      required:
-      - driverId
-      - available
-      properties:
-        driverId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: driver_456
-        available:
-          type: boolean
-          example: false
-    NearbyResponse:
-      type: object
-      required:
-      - drivers
-      properties:
-        drivers:
-          type: array
-          items:
-            type: object
-            required:
-            - driverId
-            - location
-            - distanceMeters
-            properties:
-              driverId:
+                $ref: '#/components/schemas/Ready'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
                 type: string
-                minLength: 1
-                pattern: \S
-                example: driver_456
-              location: *id004
-              distanceMeters:
-                type: integer
-                example: 500
-    ErrorResponse:
-      type: object
-      required:
-      - error
-      properties:
-        error:
-          type: object
-          required:
-          - code
-          - message
-          - details
-          properties:
-            code:
-              type: string
-              example: VALIDATION_ERROR
-            message:
-              type: string
-              example: Invalid request body
-            details:
-              type: array
-              items:
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
                 type: string
-              example:
-              - fareId must not be blank
+      security: []
+      summary: Stateless service readiness
+servers:
+  - url: http://localhost:8082
