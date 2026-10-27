@@ -122,6 +122,18 @@ Suite cần PostgreSQL/Redis native trên PATH, khởi động instance riêng v
 
 Notebook: [kaggle_cpu.ipynb](notebooks/kaggle_cpu.ipynb). Hướng dẫn [Kaggle](docs/kaggle.md) có bootstrap native đã khóa source/checksum, không cần Docker daemon. Có thể đóng gói chính source local bằng `python3 scripts/package_kaggle.py` để attach Dataset. Chưa coi kiểm chứng Kaggle hoàn tất cho đến khi có `Save & Run All` thành công trên tài khoản Kaggle.
 
+## Phân công phát triển tiếp cho 3 người
+
+[Bảng phân công và vùng bảo vệ](docs/team/README.md) giữ Ride/race condition, Auth, hạ tầng và tích hợp cuối ở máy hiện tại. Ba người triển khai application/repository thật độc lập, giữ mock/default runtime hiện tại đến khi người tích hợp bật có chủ ý:
+
+| Người | Service | Prompt chạy với agent |
+| --- | --- | --- |
+| Người 1 | Location | [Instruction Location](docs/team/location-agent.md) |
+| Người 2 | Matching | [Instruction Matching](docs/team/matching-agent.md) |
+| Người 3 | Notification | [Instruction Notification](docs/team/notification-agent.md) |
+
+Mỗi prompt dẫn tới yêu cầu, ownership, test PostgreSQL và mẫu bàn giao riêng. [Quy trình tích hợp](docs/team/integration.md) mô tả cách nhận branch/PR, công bố contract mới và kiểm tra race regression. Các yêu cầu đích này chưa phải tính năng runtime đã được bật.
+
 ## Tài liệu cho dev và agent
 
 - [API catalog và giao tiếp](docs/api-catalog.md): output, security, errors và stub.

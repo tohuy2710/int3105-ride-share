@@ -1,23 +1,25 @@
 # Phát triển nhiều service
 
-## Ownership
+## Ownership và phân công hiện tại
 
-| Vai trò | Phạm vi sửa chính |
-| --- | --- |
-| Auth dev | `cmd/auth`, `internal/auth` |
-| Ride dev | `cmd/ride`, `internal/ride`, migration Ride |
-| Location dev | `cmd/location`, `internal/location` |
-| Matching dev | `cmd/matching`, `internal/matching` |
-| Notification dev | `cmd/notification`, `internal/notification` |
-| Người tích hợp | platform, contracts, clients, Compose, dependency, CI, benchmark, tài liệu chung |
+Theo [bộ phân công cho 3 người](team/README.md):
 
-Mỗi dev tạo branch/worktree riêng từ cùng commit đã khóa contract. Không chỉnh phần của dev khác để chữa lỗi tích hợp. Đề xuất contract trước, cập nhật fixture/client stub và test tương ứng rồi mới triển khai logic. Người tích hợp xử lý thay đổi `go.mod/go.sum`, Compose, platform và contract dùng chung để tránh xung đột. Đây là quy trình ownership, không phải cơ chế khóa Git; cherry-pick/merge qua PR và chạy CI.
+| Người | Phần được giao | Instruction |
+| --- | --- | --- |
+| Người 1 | Application/repository PostgreSQL thật, SQL/test riêng Location | [Prompt Location](team/location-agent.md) |
+| Người 2 | Application/repository PostgreSQL thật, SQL/test riêng Matching; fake remote ports trong test | [Prompt Matching](team/matching-agent.md) |
+| Người 3 | Application/repository PostgreSQL thật, SQL/test riêng Notification, chưa delivery/push | [Prompt Notification](team/notification-agent.md) |
+| Máy hiện tại — người tích hợp | Ride/race, Auth và toàn bộ phần hiện có dùng chung, contract/migration/runtime/HTTP/RabbitMQ, benchmark/Kaggle, tích hợp cuối | [Checklist tích hợp](team/integration.md) |
 
-Ví dụ tạo worktree từ thư mục repo:
+Ba người làm trong `internal/<service>/` và file handoff của mình, giữ nguyên mock/interface/handler/router/DTO đang chạy. `cmd/`, platform, contracts/clients, OpenAPI, shared tests, dependencies, Compose/CI, root migration và benchmark do người tích hợp giữ. Không còn phân Auth hoặc Ride cho ba người này. Phạm vi chi tiết trong [team README](team/README.md) được ưu tiên cho đợt giao việc này.
+
+Mỗi dev dùng branch/worktree riêng từ commit tài liệu chung được người tích hợp thông báo; ghi BASE_SHA thực tế. Baseline race được bảo vệ là `8dd4bd0cadefe73c82b92ee5fd06c87b06cf7cd9`, không phải yêu cầu quay về commit cũ làm mất instruction mới. Ví dụ khi đã có COMMON_BASE_SHA đúng:
 
 ```bash
-git worktree add ../ride-share-location -b feat/location
+git worktree add ../ride-share-location -b feat/location-logic "$COMMON_BASE_SHA"
 ```
+
+Không ghi đè thay đổi người khác, không tự push main/merge. Đề xuất thay đổi shared contract/dependency/config trong [handoff](team/handoff-template.md); tiếp tục phần application/repository độc lập bằng interface/model nội bộ khi cần. Người tích hợp công bố contract đích rồi nối runtime sau khi nhận code. Không tự sửa scope hoặc fixture để làm test qua.
 
 ## Ranh giới kiến trúc
 
@@ -32,7 +34,7 @@ git worktree add ../ride-share-location -b feat/location
 
 OpenAPI 3.0.3 nằm trong `docs/openapi`. API catalog mô tả fixture và caller dự kiến. Giữ camelCase, enum, nullability, status code, error envelope và ý nghĩa mock đúng contract.
 
-Khi thay đổi API: sửa OpenAPI và catalog, thống nhất với consumer, sửa `internal/contracts`/DTO/client stub, cập nhật test response thực tế. Không đổi fixture hoặc response vì tiện triển khai; thay đổi phá vỡ tương thích cần người tích hợp duyệt. Không tự mock luồng Ride đang dùng PostgreSQL để làm test qua.
+Người tích hợp thay đổi API theo thứ tự: công bố OpenAPI/catalog và thống nhất consumer, cập nhật `internal/contracts`/DTO/client stub, handler mapping và test response thực tế. Dev service mô tả delta trong handoff, chưa sửa contract chung hoặc endpoint đang mock. Không đổi fixture hoặc response vì tiện triển khai; thay đổi phá vỡ tương thích cần người tích hợp duyệt. Không tự mock luồng Ride đang dùng PostgreSQL để làm test qua.
 
 ## Chạy và kiểm tra
 
@@ -58,7 +60,7 @@ Hoặc `python3 scripts/native_check.py` tạo database/Redis riêng. Native run
 
 ## Migration và cấu hình
 
-Ứng dụng không tự chạy migration. Bootstrap hiện tại chạy transaction và advisory lock khi gọi `cmd/migrate`; có thể chạy lại. Từ migration tiếp theo, cần thêm migration mới và cơ chế version/checksum trước khi thay đổi schema; không sửa bootstrap cho database đã triển khai. Không thêm bảng cho API còn mock.
+Ứng dụng không tự chạy migration. Bootstrap hiện tại chạy transaction và advisory lock khi gọi `cmd/migrate`; có thể chạy lại. Từ migration tiếp theo, cần thêm migration mới và cơ chế version/checksum trước khi thay đổi schema; không sửa bootstrap cho database đã triển khai. Không thêm bảng cho API còn mock trừ phần repository thật được giao rõ ràng trong team requirements: SQL riêng schema service được bàn giao/test độc lập, chưa được đưa vào runtime/runner chung.
 
 `JWT_SECRET` tối thiểu 32 byte, `INTERNAL_TOKEN` tối thiểu 16 byte; thiếu cấu hình làm service fail startup. RIDER/DRIVER lấy từ JWT, không tin `X-Driver-ID` hoặc ID trong body. Internal token dùng riêng cho service API. DB pool mặc định 10 connection/replica; timeout DB 2 giây; Redis timeout 100 ms; lock TTL 5 giây.
 

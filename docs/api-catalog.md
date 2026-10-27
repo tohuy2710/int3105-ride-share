@@ -1,5 +1,7 @@
 # API catalog v1
 
+Catalog này mô tả runtime hiện tại. [Phân công phát triển tiếp](team/README.md) và ba requirement trong bộ tài liệu team mô tả implementation thật đích; chúng chưa thay đổi OpenAPI/code đang chạy. Người tích hợp sẽ công bố contract/mapping mới trước khi bật các service thật.
+
 OpenAPI trong `docs/openapi` là nguồn chuẩn đầy đủ. Tất cả API trả JSON, body tối đa 1 MiB; ID chuỗi không rỗng. `X-Request-ID` echo tối đa 128 ký tự hoặc sinh mới. Mọi lỗi có `{error:{code,message,details:[]}}`. `details` chỉ mô tả, client phân nhánh bằng `code`.
 
 ## Auth và Ride
