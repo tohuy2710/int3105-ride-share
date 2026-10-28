@@ -7,3 +7,6 @@ bin
 .cache
 *.log
 docs/system_design.md
+work
+__pycache__
+*.pyc

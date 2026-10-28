@@ -1,73 +1,165 @@
+name: ride-share
+x-app-env: &app-env
+  GIN_MODE: ${GIN_MODE:-release}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  JWT_SECRET: ${JWT_SECRET:?Copy .env.example to .env}
+  JWT_ISSUER: ${JWT_ISSUER:-ride-share}
+  JWT_AUDIENCE: ${JWT_AUDIENCE:-ride-share-api}
+  INTERNAL_TOKEN: ${INTERNAL_TOKEN:?Copy .env.example to .env}
+  RIDE_URL: http://ride:8081
+  LOCATION_URL: http://location:8082
+  MATCHING_URL: http://matching:8083
+  NOTIFICATION_URL: http://notification:8084
+  AUTH_URL: http://auth:8085
+  RABBITMQ_URL: amqp://ride:ride_local@rabbitmq:5672/
 services:
-  ride:
+  postgres:
+    image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    profiles: [infra, full]
+    environment:
+      POSTGRES_USER: ride
+      POSTGRES_PASSWORD: ride_local
+      POSTGRES_DB: rides
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ride -d rides"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+    profiles: [infra, full]
+    command: [redis-server, --save, "", --appendonly, "no"]
+    ports: ["127.0.0.1:${REDIS_PORT:-6379}:6379"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+  rabbitmq:
+    image: rabbitmq:4.1.0-management-alpine@sha256:770948395acde6a1faf449f8570dc1f0365eb573dba1c6c89d060e1fcbfe199c
+    profiles: [infra, full]
+    environment:
+      RABBITMQ_DEFAULT_USER: ride
+      RABBITMQ_DEFAULT_PASS: ride_local
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  migrate:
+    image: ride-share-migrate:1.0.0
+    profiles: [full]
     build:
       context: .
-      args:
-        SERVICE: ride
-    ports:
-      - "${RIDE_PORT:-8081}:8081"
+      args: {SERVICE: migrate}
     environment:
+      DATABASE_URL: postgres://ride:ride_local@postgres:5432/rides?sslmode=disable
+    depends_on:
+      postgres: {condition: service_healthy}
+  ride:
+    image: ride-share-ride:1.0.0
+    profiles: [full]
+    build:
+      context: .
+      args: {SERVICE: ride}
+    ports: ["127.0.0.1:${RIDE_PORT:-8081}:8081"]
+    environment:
+      <<: *app-env
       PORT: "8081"
-      GIN_MODE: ${GIN_MODE:-release}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://ride:ride_local@postgres:5432/rides?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      ACCEPT_MODE: ${ACCEPT_MODE:-redis_sql}
+      DB_TIMEOUT: ${DB_TIMEOUT:-2s}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-10}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-100ms}
+      REDIS_LOCK_TTL: ${REDIS_LOCK_TTL:-5s}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
-      interval: 10s
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8081/readyz"]
+      interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 10
       start_period: 5s
     stop_grace_period: 15s
   location:
+    image: ride-share-location:1.0.0
+    profiles: [full]
     build:
       context: .
-      args:
-        SERVICE: location
-    ports:
-      - "${LOCATION_PORT:-8082}:8082"
+      args: {SERVICE: location}
+    ports: ["127.0.0.1:${LOCATION_PORT:-8082}:8082"]
     environment:
+      <<: *app-env
       PORT: "8082"
-      GIN_MODE: ${GIN_MODE:-release}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/healthz"]
-      interval: 10s
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8082/readyz"]
+      interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 10
       start_period: 5s
     stop_grace_period: 15s
   matching:
+    image: ride-share-matching:1.0.0
+    profiles: [full]
     build:
       context: .
-      args:
-        SERVICE: matching
-    ports:
-      - "${MATCHING_PORT:-8083}:8083"
+      args: {SERVICE: matching}
+    ports: ["127.0.0.1:${MATCHING_PORT:-8083}:8083"]
     environment:
+      <<: *app-env
       PORT: "8083"
-      GIN_MODE: ${GIN_MODE:-release}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8083/healthz"]
-      interval: 10s
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8083/readyz"]
+      interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 10
       start_period: 5s
     stop_grace_period: 15s
   notification:
+    image: ride-share-notification:1.0.0
+    profiles: [full]
     build:
       context: .
-      args:
-        SERVICE: notification
-    ports:
-      - "${NOTIFICATION_PORT:-8084}:8084"
+      args: {SERVICE: notification}
+    ports: ["127.0.0.1:${NOTIFICATION_PORT:-8084}:8084"]
     environment:
+      <<: *app-env
       PORT: "8084"
-      GIN_MODE: ${GIN_MODE:-release}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/healthz"]
-      interval: 10s
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8084/readyz"]
+      interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 10
       start_period: 5s
     stop_grace_period: 15s
+  auth:
+    image: ride-share-auth:1.0.0
+    profiles: [full]
+    build:
+      context: .
+      args: {SERVICE: auth}
+    ports: ["127.0.0.1:${AUTH_PORT:-8085}:8085"]
+    environment:
+      <<: *app-env
+      PORT: "8085"
+      AUTH_FIXTURES: /app/fixtures/accounts.json
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8085/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    stop_grace_period: 15s
+volumes:
+  postgres-data:
+  rabbitmq-data:

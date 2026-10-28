@@ -1,0 +1,29 @@
+{
+  "images": {
+    "go": "golang:1.25.9-alpine@sha256:5caaf1cca9dc351e13deafbc3879fd4754801acba8653fa9540cea125d01a71f",
+    "runtime": "alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63",
+    "postgres": "postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297",
+    "redis": "redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952",
+    "rabbitmq": "rabbitmq:4.1.0-management-alpine@sha256:770948395acde6a1faf449f8570dc1f0365eb573dba1c6c89d060e1fcbfe199c"
+  },
+  "sources": {
+    "go": {
+      "version": "1.25.9",
+      "url": "https://go.dev/dl/go1.25.9.linux-amd64.tar.gz",
+      "sha256": "00859d7bd6defe8bf84d9db9e57b9a4467b2887c18cd93ae7460e713db774bc1",
+      "directory": "go"
+    },
+    "postgres": {
+      "version": "16.10",
+      "url": "https://ftp.postgresql.org/pub/source/v16.10/postgresql-16.10.tar.bz2",
+      "sha256": "de8485f4ce9c32e3ddfeef0b7c261eed1cecb54c9bcd170e437ff454cb292b42",
+      "directory": "postgresql-16.10"
+    },
+    "redis": {
+      "version": "7.4.2",
+      "url": "https://download.redis.io/releases/redis-7.4.2.tar.gz",
+      "sha256": "4ddebbf09061cbb589011786febdb34f29767dd7f89dbe712d2b68e808af6a1f",
+      "directory": "redis-7.4.2"
+    }
+  }
+}

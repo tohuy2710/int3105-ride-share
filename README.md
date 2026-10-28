@@ -1,179 +1,143 @@
-# Ride Share — Go/Gin mock backend
+# Ride Share — Pha 1
 
-Bốn service độc lập, một Go module `int3105-ride-share`, đủ 11 endpoint đặt xe. Go **1.25.9**, Gin **v1.12.0**. Chỉ validate input và trả JSON mock; chưa có logic nghiệp vụ.
+Backend Go/Gin gồm 5 service độc lập. Ride lưu trạng thái thật trong PostgreSQL; Redis giảm contention khi nhiều tài xế nhận cùng cuốc. Auth kiểm tra tài khoản fixture và phát JWT. Các nghiệp vụ còn lại trả mock theo OpenAPI.
 
-## Chạy bằng Go
+| Service | Port | Trách nhiệm | Contract |
+| --- | --- | --- | --- |
+| Ride | 8081 | Tạo/đọc/nhận/hủy/chuyển trạng thái thật; giá mock | [ride.yaml](docs/openapi/ride.yaml) |
+| Location | 8082 | Mock tọa độ, availability, nearby | [location.yaml](docs/openapi/location.yaml) |
+| Matching | 8083 | Mock acknowledgement và trạng thái MATCHING | [matching.yaml](docs/openapi/matching.yaml) |
+| Notification | 8084 | Mock acknowledgement QUEUED | [notification.yaml](docs/openapi/notification.yaml) |
+| Auth | 8085 | Login fixture, JWT, register mock | [auth.yaml](docs/openapi/auth.yaml) |
 
-Cần Go 1.25.9 và Make. Tải dependency:
+HTTP client stub có kiểu dữ liệu thay cho OpenFeign trong Go. RabbitMQ chạy thật với topology khai báo, **chưa có publisher/consumer hoặc lời gọi HTTP liên service**. Tạo ride chưa kích hoạt matching; GET Matching vẫn `MATCHING` sau khi Ride được nhận.
+
+Location, Notification và Matching đã có application và PostgreSQL repository riêng. Các entrypoint vẫn dùng mock theo bảng trên; SQL service chưa nằm trong migration runner chung và endpoint thật chưa được bật.
+
+## Swagger UI
+
+Sau khi chạy service, mở `/swagger/index.html` trên port tương ứng:
+[Ride](http://localhost:8081/swagger/index.html),
+[Location](http://localhost:8082/swagger/index.html),
+[Matching](http://localhost:8083/swagger/index.html),
+[Notification](http://localhost:8084/swagger/index.html),
+[Auth](http://localhost:8085/swagger/index.html).
+
+UI và OpenAPI được nhúng trong binary, không cần CDN. JSON ở `/swagger/openapi.json` dùng cùng host/port với service cho **Try it out**, kể cả khi đổi `PORT`; YAML gốc ở `/swagger/openapi.yaml`. Tài liệu thể hiện runtime hiện tại, gồm các API mock. Dùng **Authorize** để nhập JWT từ `/auth/login` hoặc `X-Internal-Token` đúng loại API; quyền truy cập endpoint vẫn được kiểm tra như bình thường.
+
+## Chạy nhanh bằng Docker
+
+Yêu cầu Docker Engine/Desktop và Compose v2 hỗ trợ `--wait`.
 
 ```bash
-go mod download
+cp .env.example .env
+make compose-up
+make smoke
+make compose-down
 ```
 
-Chạy mỗi lệnh trong một terminal riêng:
+Compose chạy 5 ứng dụng, PostgreSQL, Redis, RabbitMQ Management và migration job riêng. Các port chỉ bind localhost. Migration hoàn tất trước khi Ride khởi động; ứng dụng không tự migrate. Dữ liệu PostgreSQL và RabbitMQ được giữ trong named volume; `compose-down` không xóa volume.
+
+RabbitMQ UI: http://localhost:15672, tài khoản local `ride` / `ride_local`. Các giá trị trong `.env.example` phục vụ môi trường phát triển.
+
+## Chạy từng service để phát triển
+
+Toolchain chuẩn là Go **1.25.9**; Go module yêu cầu ít nhất 1.25.0. Dependency nằm trong `go.mod/go.sum`, image và source native được khóa tại [infra/versions.json](infra/versions.json).
 
 ```bash
+cp .env.example .env
+make infra-up
+make migrate
+make run-auth
+# Các terminal riêng:
 make run-ride
 make run-location
 make run-matching
 make run-notification
 ```
 
-| Service | Port | OpenAPI |
+Make tự đọc/export `.env`; `go run` trực tiếp không đọc file này. Fixture 1 rider + 100 driver đã có sẵn, không cần seed lại. `make seed` tái tạo fixture, hash mật khẩu thay đổi nên chỉ chạy khi chủ ý cập nhật fixture. Custom fixture: `go run ./cmd/seed -drivers 200 -out .cache/accounts.json`, sau đó đổi `AUTH_FIXTURES` và khởi động lại Auth.
+
+Mật khẩu fixture mặc định: `RideShare123!`.
+
+| Email | ID | Role |
 | --- | --- | --- |
-| Ride | 8081 | [ride.yaml](docs/openapi/ride.yaml) |
-| Location | 8082 | [location.yaml](docs/openapi/location.yaml) |
-| Matching | 8083 | [matching.yaml](docs/openapi/matching.yaml) |
-| Notification | 8084 | [notification.yaml](docs/openapi/notification.yaml) |
+| `rider@example.com` | `rider_123` | RIDER |
+| `driver1@example.com` | `driver_456` | DRIVER |
+| `driver2@example.com` | `driver_457` | DRIVER |
+| `driver100@example.com` | `driver_555` | DRIVER |
 
-Mỗi tiến trình đọc `PORT`, `GIN_MODE` (`debug`, `release`, `test`) và `LOG_LEVEL` (`debug`, `info`, `warn`, `error`). Mặc định dùng port trong bảng, mode `release`, log level `info`.
-
-```bash
-PORT=9081 GIN_MODE=debug LOG_LEVEL=debug make run-ride
-```
-
-Các lệnh Go không tự đọc `.env`. `RIDE_PORT`, `LOCATION_PORT`, `MATCHING_PORT`, `NOTIFICATION_PORT` trong `.env.example` là **host port cho Docker Compose**.
-
-## Chạy bằng Docker
-
-Cần Docker Engine và Docker Compose hỗ trợ `--wait`:
+Đăng nhập:
 
 ```bash
-cp .env.example .env
-make compose-up
-make compose-down
+curl -s http://localhost:8085/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"rider@example.com","password":"RideShare123!"}'
 ```
 
-`compose-up` build bốn image từ Dockerfile dùng chung với build arg `SERVICE`, đợi health check thành công. Mỗi image chạy một binary bằng user không phải root. Không có gateway: gọi trực tiếp port của từng service. Khi đổi host port trong `.env`, đổi URL curl/OpenAPI tương ứng.
-
-## Cấu trúc và mở rộng
-
-```text
-cmd/{ride,location,matching,notification}/main.go
-internal/{ride,location,matching,notification}/
-    router.go     # Route và identity middleware
-    handler.go    # Bind/validate, gọi Service, trả HTTP response
-    dto.go        # Request/response contract
-    service.go    # Interface Service và MockService stateless
-internal/platform/
-    api/          # Validation, error envelope, request ID, log, recovery
-    app/          # Config, HTTP server, graceful shutdown
-```
-
-Để thêm logic thật, tạo implementation mới của interface `Service` và thay `MockService{}` ở entrypoint. Handler và router không cần thay đổi. Chưa có repository layer, DB, Redis, Kafka, gateway, JWT hoặc push provider.
-
-## Thử đủ 11 endpoint
-
-### Ride (8081)
+Lấy `accessToken` từ response, dùng `Authorization: Bearer <token>` cho API public. `/auth/register` trả `persisted:false`, không tạo user, không phát token; email đăng ký mới không đăng nhập được.
 
 ```bash
-# 1. Ước tính giá → 200: fare_123, 85000 VND, ETA 12 phút
-curl -i http://localhost:8081/fare -H 'Content-Type: application/json' \
-  -d '{"pickupLocation":{"lat":21.0285,"long":105.8542},"destination":{"lat":21.035,"long":105.821}}'
+curl http://localhost:8081/rides -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $RIDER_TOKEN" -d '{"fareId":"fare_123"}'
 
-# 2. Tạo ride → 201: ride_123, REQUESTED
-curl -i http://localhost:8081/rides -H 'Content-Type: application/json' \
-  -d '{"fareId":"fare_123"}'
+curl http://localhost:8081/rides/ACTUAL_RIDE_ID -H "Authorization: Bearer $RIDER_TOKEN"
 
-# 3. Đọc ride → 200: echo rideId, REQUESTED
-curl -i http://localhost:8081/rides/ride_123
+curl -X PATCH http://localhost:8081/rides/ACTUAL_RIDE_ID \
+  -H "Authorization: Bearer $DRIVER_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"action":"ACCEPT"}'
 
-# 4. Phản hồi → 200: ACCEPTED (ACCEPT) hoặc REQUESTED (DENY)
-curl -i -X PATCH http://localhost:8081/rides/ride_123 \
-  -H 'Content-Type: application/json' -d '{"action":"ACCEPT"}'
-
-# 5. Cập nhật trạng thái → 200: echo status
-curl -i -X PATCH http://localhost:8081/rides/ride_123/status \
-  -H 'Content-Type: application/json' -d '{"status":"COMPLETED"}'
+# Hủy mềm cuốc chưa được nhận; retry hủy trả 200.
+curl -X DELETE http://localhost:8081/rides/ANOTHER_REQUESTED_RIDE_ID \
+  -H "Authorization: Bearer $RIDER_TOKEN"
 ```
 
-### Location (8082)
+## Kiến trúc và tính đúng đắn
 
-```bash
-# 6. Tọa độ → 200: driver_456 và tọa độ đã gửi
-curl -i http://localhost:8082/drivers/location -H 'Content-Type: application/json' \
-  -d '{"lat":0,"long":0}'
+`HTTP handler → application/service → repository hoặc client port → adapter`. Handler chuyển DTO có validation sang kiểu nghiệp vụ; `service.go` không import Gin, SQL driver, Redis hoặc RabbitMQ. SQL/data mapper nằm trong `internal/ride/postgres`; `internal/ride/runtime` là nơi nối dependency.
 
-# 7. Availability → 200: false là giá trị hợp lệ
-curl -i -X PATCH http://localhost:8082/drivers/availability \
-  -H 'Content-Type: application/json' -d '{"available":false}'
+PostgreSQL chỉ có schema `ride`, bảng `rides` với ID, fare/rider/driver ID, status và timestamps. Không có user/fare/location table, foreign key xuyên service, CouchDB hoặc outbox. Auth fixture nằm trong file có hash bcrypt.
 
-# 8. Nearby → 200: danh sách một driver fixture, distanceMeters=500
-curl -i 'http://localhost:8082/internal/drivers/nearby?lat=21.0285&long=105.8542&radiusMeters=3000'
-```
+Hai bước nhận cuốc:
 
-### Matching (8083)
+1. **Reduce contention:** `SET ride:accept:{rideId} <token> NX PX 5000`. Không lấy được gate trả `409 ACCEPT_IN_PROGRESS`, không vào DB. Nhả gate bằng Lua so token; Redis lỗi thì fallback SQL.
+2. **Data transaction:** conditional `UPDATE ... WHERE status='REQUESTED' AND driver_id IS NULL ... RETURNING` trong transaction `READ COMMITTED`. Chỉ trả thành công sau commit. SQL là nơi quyết định cuối cùng kể cả khi gate hết TTL.
 
-```bash
-# 9. Yêu cầu matching → 202: echo rideId, MATCHING
-curl -i http://localhost:8083/internal/matching/requests \
-  -H 'Content-Type: application/json' -d '{"rideId":"ride_123"}'
+`ACCEPT_MODE=sql` bỏ gate; `redis_sql` là mặc định. Retry của người thắng khi cuốc còn `ACCEPTED` trả cùng kết quả; tài xế khác trả `409 RIDE_ALREADY_ACCEPTED`. Một tài xế vẫn có thể nhận nhiều cuốc khác nhau trong baseline này.
 
-# 10. Đọc matching → 200: echo rideId, MATCHING
-curl -i http://localhost:8083/internal/matching/requests/ride_123
-```
-
-### Notification (8084)
-
-```bash
-# 11. Yêu cầu thông báo → 202: notification_123, QUEUED và các trường đã gửi
-curl -i http://localhost:8084/internal/notifications/ride-requests \
-  -H 'Content-Type: application/json' \
-  -d '{"rideId":"ride_123","driverId":"driver_456","type":"RIDE_REQUEST"}'
-```
-
-### Health, validation và lỗi
-
-Cả bốn service có `GET /healthz`, ví dụ:
-
-```bash
-curl -i http://localhost:8081/healthz -H 'X-Request-ID: demo-request'
-```
-
-Response `{"service":"ride-service","status":"ok"}`. Header `X-Request-ID` được echo nếu có (tối đa 128 ký tự), tự sinh nếu thiếu hoặc dài hơn giới hạn; access log JSON chứa cùng request ID. Server tắt graceful khi nhận SIGINT/SIGTERM, đợi tối đa 10 giây.
-
-- Body phải là một JSON document, tối đa 1 MiB; input lỗi trả 400.
-- `lat` ∈ [-90, 90], `long` ∈ [-180, 180]; số 0 hợp lệ, thiếu trường không hợp lệ.
-- `available` bắt buộc xuất hiện, chấp nhận true và false.
-- ID là chuỗi khác rỗng/không chỉ chứa whitespace; không ép UUID hoặc kiểm tra tồn tại.
-- `action`: `ACCEPT` / `DENY`; status cập nhật: `ARRIVED` / `IN_PROGRESS` / `COMPLETED`.
-- Nearby yêu cầu query `lat`, `long`; `radiusMeters` > 0, mặc định 3000.
-- Notification yêu cầu `rideId`, `driverId`, `type: RIDE_REQUEST`.
-- Route không tồn tại trả 404, method sai trả 405, lỗi server trả 500.
-
-Mọi lỗi dùng envelope:
-
-```json
-{"error":{"code":"VALIDATION_ERROR","message":"Invalid request body","details":["..."]}}
-```
-
-`details` là mảng chuỗi, có thể rỗng; thông báo validation chỉ mang tính mô tả, không phải mã lỗi ổn định để client phân nhánh.
-
-## Giới hạn của mock
-
-- Middleware gắn `rider_123` hoặc `driver_456` theo route, không cần token. `driverId` trong notification body là người nhận thông báo.
-- Không lưu dữ liệu hoặc kiểm tra chuyển trạng thái. **GET sau PATCH vẫn trả fixture `REQUESTED`**; GET matching luôn `MATCHING` cho mọi ID hợp lệ.
-- Fare/ride/notification ID tạo mới luôn là ID mẫu. Nearby luôn trả cùng driver, không lọc theo tọa độ, bán kính hoặc availability.
-- Các request `202` chỉ nhận acknowledgement mock; không có worker, queue, matching hoặc push thật. Tạo ride không gọi Matching hay Notification.
-- API `/internal/...` chưa có xác thực, chỉ phục vụ scaffold local. Không có kiểm tra business như fareId/rideId có tồn tại hay không.
+Chuyển trạng thái: `REQUESTED → ACCEPTED → ARRIVED → IN_PROGRESS → COMPLETED`; hủy chỉ từ `REQUESTED → CANCELLED`. GET đọc trạng thái đã lưu. `driverId` luôn có trường, nhận `null` khi chưa có tài xế. `DENY` chỉ đọc, không lưu lượt từ chối.
 
 ## Kiểm tra
 
 ```bash
-make test
-make vet
-make build
+make fmt-check vet test-race contract build
+# Nếu có PostgreSQL/Redis native trên PATH, tự dựng instance riêng và dọn tiến trình:
+python3 scripts/native_check.py
+# Hoặc dùng dependency đang chạy, xem docs/development.md:
+make integration
 ```
 
-Test dùng `testing`/`httptest`, kiểm tra đủ 11 endpoint, JSON response, validation, enum, tọa độ biên/zero, boolean false, statelessness, health, request ID, recovery và lỗi 404/405/500. Binary được tạo trong `bin/`.
+Integration kiểm tra hai replica, duy nhất một người thắng, retry, ACCEPT/DELETE cạnh tranh, ownership/status, Redis lỗi, gate bị giữ, TTL, tiến trình giữ gate thoát và DB lỗi. Smoke kiểm tra API thật cùng contract các service mock.
 
-OpenAPI 3.0.3 trong `docs/openapi/` có thể import trực tiếp vào Swagger Editor hoặc công cụ API client, không cần chạy codegen.
+`GET /healthz` là liveness. `/readyz` của Ride yêu cầu bảng PostgreSQL; Redis lỗi trả HTTP 200 với `status:degraded`. Các service khác kiểm tra được cấu hình lúc khởi động và không phụ thuộc broker.
 
-Sau khi bốn service đang chạy (Go hoặc Compose), smoke test health và đủ 11 endpoint:
+## Benchmark và Kaggle
 
 ```bash
-python3 scripts/smoke.py
+make build
+python3 -m venv .cache/benchmark-venv
+.cache/benchmark-venv/bin/python -m pip install -r scripts/benchmark-requirements.txt
+make benchmark-suite PYTHON=.cache/benchmark-venv/bin/python
+# Kiểm tra nhanh load generator, không dùng kết quả làm đánh giá hiệu năng:
+python3 scripts/benchmark_suite.py --concurrency 2,10 --groups 5 --warmup 1 --repeats 2 --no-plots
 ```
 
-Script chỉ dùng thư viện chuẩn Python 3. Có thể đổi địa chỉ qua `RIDE_URL`, `LOCATION_URL`, `MATCHING_URL`, `NOTIFICATION_URL`, ví dụ `RIDE_URL=http://localhost:9081 python3 scripts/smoke.py`.
-# int3105-ride-share
+Suite cần PostgreSQL/Redis native trên PATH, khởi động instance riêng và hai replica cho từng chế độ; chưa hỗ trợ dùng lại DB production. Kết quả mặc định ở `.cache/benchmark/run-*` gồm JSON/CSV, CPU/RAM, log, metadata và biểu đồ. Xem [protocol benchmark](docs/benchmark.md).
+
+Notebook: [kaggle_cpu.ipynb](notebooks/kaggle_cpu.ipynb). Hướng dẫn [Kaggle](docs/kaggle.md) có bootstrap native đã khóa source/checksum, không cần Docker daemon. Có thể đóng gói chính source local bằng `python3 scripts/package_kaggle.py` để attach Dataset. Chưa coi kiểm chứng Kaggle hoàn tất cho đến khi có `Save & Run All` thành công trên tài khoản Kaggle.
+
+## Tài liệu phát triển
+
+- [API catalog và giao tiếp](docs/api-catalog.md): output, security, errors và stub.
+- [Phát triển nhiều service](docs/development.md): kiến trúc, migration, kiểm thử và quy trình contract.
+- [Event contract](docs/events.md): topology RabbitMQ, schema và yêu cầu khi nối transport.
+- [Đối chiếu đề Pha 1](docs/phase1.md): tiêu chí và phần còn cần xác minh.

@@ -1,6 +1,9 @@
 package ride
 
-import "int3105-ride-share/internal/platform/api"
+import (
+	"int3105-ride-share/internal/contracts"
+	"int3105-ride-share/internal/platform/api"
+)
 
 type FareRequest struct {
 	PickupLocation *api.Coordinates `json:"pickupLocation" binding:"required"`
@@ -18,19 +21,15 @@ type RideResponse struct {
 	RideID string `json:"rideId"`
 	Status string `json:"status"`
 }
-type DetailsResponse struct {
-	RideID  string `json:"rideId"`
-	FareID  string `json:"fareId"`
-	RiderID string `json:"riderId"`
-	Status  string `json:"status"`
-}
+type DetailsResponse = contracts.Ride
 type ActionRequest struct {
 	Action string `json:"action" binding:"required,oneof=ACCEPT DENY"`
 }
 type ActionResponse struct {
-	RideID string `json:"rideId"`
-	Action string `json:"action"`
-	Status string `json:"status"`
+	RideID   string  `json:"rideId"`
+	Action   string  `json:"action"`
+	DriverID *string `json:"driverId"`
+	Status   string  `json:"status"`
 }
 type StatusRequest struct {
 	Status string `json:"status" binding:"required,oneof=ARRIVED IN_PROGRESS COMPLETED"`

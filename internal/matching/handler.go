@@ -2,6 +2,7 @@ package matching
 
 import (
 	"github.com/gin-gonic/gin"
+	"int3105-ride-share/internal/contracts"
 	"int3105-ride-share/internal/platform/api"
 )
 
@@ -12,7 +13,7 @@ func (h *Handler) RequestMatching(c *gin.Context) {
 	if !api.BindJSON(c, &input) {
 		return
 	}
-	result, err := h.service.RequestMatching(c.Request.Context(), input)
+	result, err := h.service.RequestMatching(c.Request.Context(), contracts.MatchingRequest{RideID: input.RideID})
 	if err != nil {
 		api.Fail(c, 500, "INTERNAL_ERROR", "Internal server error")
 		return

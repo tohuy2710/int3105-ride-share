@@ -1,6 +1,9 @@
 package location
 
-import "int3105-ride-share/internal/platform/api"
+import (
+	"int3105-ride-share/internal/contracts"
+	"int3105-ride-share/internal/platform/api"
+)
 
 type LocationRequest = api.Coordinates
 type LocationResponse struct {
@@ -20,11 +23,5 @@ type NearbyQuery struct {
 	Long         *float64 `form:"long" binding:"required,gte=-180,lte=180"`
 	RadiusMeters float64  `form:"radiusMeters,default=3000" binding:"gt=0"`
 }
-type Driver struct {
-	DriverID       string          `json:"driverId"`
-	Location       api.Coordinates `json:"location"`
-	DistanceMeters int             `json:"distanceMeters"`
-}
-type NearbyResponse struct {
-	Drivers []Driver `json:"drivers"`
-}
+type Driver = contracts.Driver
+type NearbyResponse = contracts.NearbyResponse

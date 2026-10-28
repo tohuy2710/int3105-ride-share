@@ -1,508 +1,1009 @@
-openapi: 3.0.3
+components:
+  schemas:
+    ActionRequest:
+      additionalProperties: true
+      properties:
+        action:
+          enum:
+            - ACCEPT
+            - DENY
+          type: string
+      required:
+        - action
+      type: object
+    ActionResponse:
+      additionalProperties: false
+      properties:
+        action:
+          enum:
+            - ACCEPT
+            - DENY
+          type: string
+        driverId:
+          minLength: 1
+          nullable: true
+          pattern: \S
+          type: string
+        rideId:
+          minLength: 1
+          pattern: \S
+          type: string
+        status:
+          enum:
+            - REQUESTED
+            - ACCEPTED
+            - ARRIVED
+            - IN_PROGRESS
+            - COMPLETED
+            - CANCELLED
+          type: string
+      required:
+        - rideId
+        - action
+        - driverId
+        - status
+      type: object
+    Coordinates:
+      additionalProperties: true
+      properties:
+        lat:
+          format: double
+          maximum: 90
+          minimum: -90
+          type: number
+        long:
+          format: double
+          maximum: 180
+          minimum: -180
+          type: number
+      required:
+        - lat
+        - long
+      type: object
+    CreateRequest:
+      additionalProperties: true
+      properties:
+        fareId:
+          minLength: 1
+          pattern: \S
+          type: string
+      required:
+        - fareId
+      type: object
+    DetailsResponse:
+      additionalProperties: false
+      properties:
+        driverId:
+          minLength: 1
+          nullable: true
+          pattern: \S
+          type: string
+        fareId:
+          minLength: 1
+          pattern: \S
+          type: string
+        rideId:
+          minLength: 1
+          pattern: \S
+          type: string
+        riderId:
+          minLength: 1
+          pattern: \S
+          type: string
+        status:
+          enum:
+            - REQUESTED
+            - ACCEPTED
+            - ARRIVED
+            - IN_PROGRESS
+            - COMPLETED
+            - CANCELLED
+          type: string
+      required:
+        - rideId
+        - fareId
+        - riderId
+        - driverId
+        - status
+      type: object
+    ErrorResponse:
+      additionalProperties: false
+      properties:
+        error:
+          additionalProperties: false
+          properties:
+            code:
+              enum:
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - RIDE_NOT_FOUND
+                - INVALID_RIDE_STATE
+                - RIDE_ALREADY_ACCEPTED
+                - ACCEPT_IN_PROGRESS
+                - DEPENDENCY_UNAVAILABLE
+                - INTERNAL_ERROR
+                - NOT_FOUND
+                - METHOD_NOT_ALLOWED
+              type: string
+            details:
+              items:
+                type: string
+              type: array
+            message:
+              type: string
+          required:
+            - code
+            - message
+            - details
+          type: object
+      required:
+        - error
+      type: object
+    FareRequest:
+      additionalProperties: true
+      properties:
+        destination:
+          $ref: '#/components/schemas/Coordinates'
+        pickupLocation:
+          $ref: '#/components/schemas/Coordinates'
+      required:
+        - pickupLocation
+        - destination
+      type: object
+    FareResponse:
+      additionalProperties: false
+      properties:
+        estimatedFare:
+          enum:
+            - 85000
+          type: integer
+        etaMinutes:
+          enum:
+            - 12
+          type: integer
+        fareId:
+          minLength: 1
+          pattern: \S
+          type: string
+      required:
+        - fareId
+        - estimatedFare
+        - etaMinutes
+      type: object
+    Health:
+      additionalProperties: false
+      properties:
+        service:
+          enum:
+            - ride-service
+          type: string
+        status:
+          enum:
+            - ok
+          type: string
+      required:
+        - service
+        - status
+      type: object
+    Metrics:
+      additionalProperties: false
+      properties:
+        redisFallback:
+          minimum: 0
+          type: integer
+        redisRejected:
+          minimum: 0
+          type: integer
+        sqlAttempts:
+          minimum: 0
+          type: integer
+      required:
+        - sqlAttempts
+        - redisRejected
+        - redisFallback
+      type: object
+    Ready:
+      additionalProperties: false
+      properties:
+        postgres:
+          enum:
+            - ok
+            - unavailable
+          type: string
+        redis:
+          enum:
+            - unavailable
+          type: string
+        status:
+          enum:
+            - ok
+            - degraded
+            - unavailable
+          type: string
+      required:
+        - status
+      type: object
+    RideResponse:
+      additionalProperties: false
+      properties:
+        rideId:
+          minLength: 1
+          pattern: \S
+          type: string
+        status:
+          enum:
+            - REQUESTED
+            - ACCEPTED
+            - ARRIVED
+            - IN_PROGRESS
+            - COMPLETED
+            - CANCELLED
+          type: string
+      required:
+        - rideId
+        - status
+      type: object
+    StatusRequest:
+      additionalProperties: true
+      properties:
+        status:
+          enum:
+            - ARRIVED
+            - IN_PROGRESS
+            - COMPLETED
+          type: string
+      required:
+        - status
+      type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
+    internalToken:
+      in: header
+      name: X-Internal-Token
+      type: apiKey
 info:
+  description: Phase 1. JSON <= 1 MiB. Unknown input fields are ignored for compatibility. IDs are nonblank strings. Public routes use JWT; internal routes use X-Internal-Token. Only Ride persists data; Auth uses fixtures. No inter-service HTTP or AMQP wiring.
   title: Ride Service API
-  version: 0.1.0
-  description: 'API mock không lưu trạng thái, không kiểm tra tồn tại ID, không gọi
-    service khác. Identity mẫu: rider_123/driver_456; không cần token. 202 chỉ xác
-    nhận mock. GET vẫn trả fixture sau PATCH. Body tối đa 1 MiB.'
-servers:
-- url: http://localhost:8081
+  version: 1.0.0
+openapi: 3.0.3
 paths:
   /fare:
     post:
       operationId: estimateFare
-      summary: Ước tính giá và ETA
-      responses:
-        '200':
-          description: Mock response
-          headers:
-            X-Request-ID: &id001
-              description: Request ID được echo hoặc tự sinh.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FareResponse'
-              example:
-                fareId: fare_123
-                estimatedFare: 85000
-                etaMinutes: 12
-        '400':
-          description: Input không hợp lệ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/FareRequest'
-  /rides:
-    post:
-      operationId: createRide
-      summary: Đặt chuyến đi
-      responses:
-        '201':
-          description: Mock response
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RideResponse'
-              example:
-                rideId: ride_123
-                status: REQUESTED
-        '400':
-          description: Input không hợp lệ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      requestBody:
         required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateRequest'
-  /rides/{rideId}:
-    get:
-      operationId: getRide
-      summary: Đọc fixture chuyến đi
       responses:
-        '200':
-          description: Mock response
+        "200":
+          content:
+            application/json:
+              example:
+                estimatedFare: 85000
+                etaMinutes: 12
+                fareId: fare_123
+              schema:
+                $ref: '#/components/schemas/FareResponse'
+          description: Success
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'FORBIDDEN: role or ownership denied'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: 'RIDER: fixed fare fixture'
+  /healthz:
+    get:
+      operationId: rideHealth
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security: []
+      summary: Process liveness; does not inspect dependencies
+  /internal/metrics:
+    get:
+      operationId: rideMetrics
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metrics'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - internalToken: []
+      summary: Cumulative counters for this process; sum replica deltas outside timed bursts
+  /internal/rides/{rideId}:
+    get:
+      operationId: internalRide
+      responses:
+        "200":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DetailsResponse'
-              example:
-                rideId: ride_123
-                fareId: fare_123
-                riderId: rider_123
-                status: REQUESTED
-        '400':
-          description: Input không hợp lệ
+          description: Success
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          description: 'VALIDATION_ERROR: malformed or invalid input'
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
+          description: RIDE_NOT_FOUND or NOT_FOUND
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-      parameters:
-      - name: rideId
-        in: path
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - internalToken: []
+      summary: 'Matching -> Ride: read persisted snapshot'
+    parameters:
+      - in: path
+        name: rideId
         required: true
         schema:
-          type: string
           minLength: 1
           pattern: \S
-          example: ride_123
-        description: Echo nguyên ID; không tra cứu tồn tại.
-    patch:
-      operationId: respondToRide
-      summary: ACCEPT trả ACCEPTED; DENY trả REQUESTED
+          type: string
+  /readyz:
+    get:
+      operationId: rideReady
       responses:
-        '200':
-          description: Mock response
-          headers:
-            X-Request-ID: *id001
+        "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ActionResponse'
-              example:
-                rideId: ride_123
-                action: ACCEPT
-                status: ACCEPTED
-        '400':
-          description: Input không hợp lệ
+                $ref: '#/components/schemas/Ready'
+          description: Success
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          description: INTERNAL_ERROR
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
+          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
           headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
-          headers:
-            X-Request-ID: *id001
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
+      security: []
+      summary: Dependency readiness; Redis unavailable is 200 degraded
+  /rides:
+    post:
+      operationId: createRide
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ActionRequest'
-      parameters:
-      - name: rideId
-        in: path
+              $ref: '#/components/schemas/CreateRequest'
         required: true
-        schema:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: ride_123
-        description: Echo nguyên ID; không tra cứu tồn tại.
-  /rides/{rideId}/status:
-    patch:
-      operationId: updateRideStatus
-      summary: Echo trạng thái, không lưu thay đổi
       responses:
-        '200':
-          description: Mock response
-          headers:
-            X-Request-ID: *id001
+        "201":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RideResponse'
-              example:
-                rideId: ride_123
-                status: COMPLETED
-        '400':
-          description: Input không hợp lệ
+          description: Success
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Route không tồn tại; không dùng cho ID chưa tồn tại
+          description: 'VALIDATION_ERROR: malformed or invalid input'
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '405':
-          description: Method không được hỗ trợ
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Lỗi server
+          description: 'FORBIDDEN: role or ownership denied'
           headers:
-            X-Request-ID: *id001
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-      requestBody:
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: 'RIDER: persist a new REQUESTED ride; does not call Matching'
+  /rides/{rideId}:
+    delete:
+      operationId: cancelRide
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RideResponse'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'FORBIDDEN: role or ownership denied'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: RIDE_NOT_FOUND or NOT_FOUND
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ACCEPT_IN_PROGRESS, RIDE_ALREADY_ACCEPTED or INVALID_RIDE_STATE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: 'RIDER owner: soft-cancel REQUESTED; CANCELLED retry returns 200'
+    get:
+      operationId: getRide
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailsResponse'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'FORBIDDEN: role or ownership denied'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: RIDE_NOT_FOUND or NOT_FOUND
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: Read persisted ride; owner rider or assigned driver only
+    parameters:
+      - in: path
+        name: rideId
         required: true
+        schema:
+          minLength: 1
+          pattern: \S
+          type: string
+    patch:
+      operationId: respondToRide
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'FORBIDDEN: role or ownership denied'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: RIDE_NOT_FOUND or NOT_FOUND
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ACCEPT_IN_PROGRESS, RIDE_ALREADY_ACCEPTED or INVALID_RIDE_STATE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: 'DRIVER: ACCEPT uses Redis gate and atomic SQL; DENY reads without mutation'
+  /rides/{rideId}/status:
+    parameters:
+      - in: path
+        name: rideId
+        required: true
+        schema:
+          minLength: 1
+          pattern: \S
+          type: string
+    patch:
+      operationId: updateRideStatus
+      requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/StatusRequest'
-      parameters:
-      - name: rideId
-        in: path
         required: true
-        schema:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: ride_123
-        description: Echo nguyên ID; không tra cứu tồn tại.
-  /healthz:
-    get:
-      operationId: health
-      summary: Health check
       responses:
-        '200':
-          description: Service đang chạy
-          headers:
-            X-Request-ID: *id001
+        "200":
           content:
             application/json:
               schema:
-                type: object
-                required:
-                - service
-                - status
-                properties:
-                  service:
-                    type: string
-                    example: ride-service
-                  status:
-                    type: string
-                    enum:
-                    - ok
-                    example: ok
-              example:
-                service: ride-service
-                status: ok
-components:
-  schemas:
-    Coordinates:
-      type: object
-      required:
-      - lat
-      - long
-      properties:
-        lat:
-          type: number
-          format: double
-          minimum: -90
-          maximum: 90
-          example: 21.0285
-        long:
-          type: number
-          format: double
-          minimum: -180
-          maximum: 180
-          example: 105.8542
-    FareRequest:
-      type: object
-      required:
-      - pickupLocation
-      - destination
-      properties:
-        pickupLocation:
-          $ref: '#/components/schemas/Coordinates'
-        destination:
-          $ref: '#/components/schemas/Coordinates'
-    FareResponse:
-      type: object
-      required:
-      - fareId
-      - estimatedFare
-      - etaMinutes
-      properties:
-        fareId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: fare_123
-        estimatedFare:
-          type: integer
-          example: 85000
-          description: Giá mock, đơn vị VND.
-        etaMinutes:
-          type: integer
-          example: 12
-    CreateRequest:
-      type: object
-      required:
-      - fareId
-      properties:
-        fareId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: fare_123
-    RideResponse:
-      type: object
-      required:
-      - rideId
-      - status
-      properties:
-        rideId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: ride_123
-        status:
-          type: string
-          example: REQUESTED
-    DetailsResponse:
-      type: object
-      required:
-      - rideId
-      - fareId
-      - riderId
-      - status
-      properties:
-        rideId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: ride_123
-        fareId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: fare_123
-        riderId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: rider_123
-        status:
-          type: string
-          example: REQUESTED
-    ActionRequest:
-      type: object
-      required:
-      - action
-      properties:
-        action:
-          type: string
-          enum:
-          - ACCEPT
-          - DENY
-          example: ACCEPT
-    ActionResponse:
-      type: object
-      required:
-      - rideId
-      - action
-      - status
-      properties:
-        rideId:
-          type: string
-          minLength: 1
-          pattern: \S
-          example: ride_123
-        action:
-          type: string
-          enum:
-          - ACCEPT
-          - DENY
-          example: ACCEPT
-        status:
-          type: string
-          enum:
-          - ACCEPTED
-          - REQUESTED
-          example: ACCEPTED
-    StatusRequest:
-      type: object
-      required:
-      - status
-      properties:
-        status:
-          type: string
-          enum:
-          - ARRIVED
-          - IN_PROGRESS
-          - COMPLETED
-          example: COMPLETED
-    ErrorResponse:
-      type: object
-      required:
-      - error
-      properties:
-        error:
-          type: object
-          required:
-          - code
-          - message
-          - details
-          properties:
-            code:
-              type: string
-              example: VALIDATION_ERROR
-            message:
-              type: string
-              example: Invalid request body
-            details:
-              type: array
-              items:
+                $ref: '#/components/schemas/RideResponse'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
                 type: string
-              example:
-              - fareId must not be blank
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'FORBIDDEN: role or ownership denied'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: RIDE_NOT_FOUND or NOT_FOUND
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ACCEPT_IN_PROGRESS, RIDE_ALREADY_ACCEPTED or INVALID_RIDE_STATE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - bearerAuth: []
+      summary: 'Assigned DRIVER: ACCEPTED -> ARRIVED -> IN_PROGRESS -> COMPLETED; same-state retry is idempotent'
+servers:
+  - url: http://localhost:8081

@@ -75,9 +75,6 @@ func RideID(c *gin.Context) (string, bool) {
 	}
 	return id, true
 }
-func Identity(key, value string) gin.HandlerFunc {
-	return func(c *gin.Context) { c.Set(key, value); c.Next() }
-}
 
 type Coordinates struct {
 	Lat  *float64 `json:"lat" binding:"required,gte=-90,lte=90"`
