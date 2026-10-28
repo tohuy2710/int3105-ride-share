@@ -19,6 +19,9 @@ components:
                 - INTERNAL_ERROR
                 - NOT_FOUND
                 - METHOD_NOT_ALLOWED
+                - MATCHING_NOT_FOUND
+                - MATCHING_REQUEST_CONFLICT
+                - NOTIFICATION_NOT_FOUND
               type: string
             details:
               items:
@@ -181,9 +184,9 @@ components:
       name: X-Internal-Token
       type: apiKey
 info:
-  description: Phase 1. JSON <= 1 MiB. Unknown input fields are ignored for compatibility. IDs are nonblank strings. Public routes use JWT; internal routes use X-Internal-Token. Only Ride persists data; Auth uses fixtures. No inter-service HTTP or AMQP wiring.
+  description: JSON <= 1 MiB. Unknown input fields are ignored. Public routes use JWT; internal routes use X-Internal-Token. Ride, Location, Matching and Notification persist in PostgreSQL; inter-service calls use authenticated HTTP. Notification QUEUED means durably stored, not device delivery. Auth uses fixture credentials; registration and fare estimation remain mock.
   title: Auth Service API
-  version: 1.0.0
+  version: 1.1.0
 openapi: 3.0.3
 paths:
   /auth/login:

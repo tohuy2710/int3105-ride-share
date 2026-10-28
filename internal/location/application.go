@@ -43,8 +43,7 @@ type Repository interface {
 	ListAvailable(context.Context) ([]DriverState, error)
 }
 
-// Application is the real implementation. Construction performs no I/O and
-// does not enable it in the existing mock runtime.
+// Application persists driver state and finds nearby available drivers.
 type Application struct{ repository Repository }
 
 func NewApplication(repository Repository) *Application {

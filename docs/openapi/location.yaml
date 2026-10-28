@@ -74,6 +74,9 @@ components:
                 - INTERNAL_ERROR
                 - NOT_FOUND
                 - METHOD_NOT_ALLOWED
+                - MATCHING_NOT_FOUND
+                - MATCHING_REQUEST_CONFLICT
+                - NOTIFICATION_NOT_FOUND
               type: string
             details:
               items:
@@ -165,9 +168,9 @@ components:
       name: X-Internal-Token
       type: apiKey
 info:
-  description: Phase 1. JSON <= 1 MiB. Unknown input fields are ignored for compatibility. IDs are nonblank strings. Public routes use JWT; internal routes use X-Internal-Token. Only Ride persists data; Auth uses fixtures. No inter-service HTTP or AMQP wiring.
+  description: JSON <= 1 MiB. Unknown input fields are ignored. Public routes use JWT; internal routes use X-Internal-Token. Ride, Location, Matching and Notification persist in PostgreSQL; inter-service calls use authenticated HTTP. Notification QUEUED means durably stored, not device delivery. Auth uses fixture credentials; registration and fare estimation remain mock.
   title: Location Service API
-  version: 1.0.0
+  version: 1.1.0
 openapi: 3.0.3
 paths:
   /drivers/availability:
@@ -235,9 +238,20 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
       security:
         - bearerAuth: []
-      summary: 'DRIVER: echo availability; no persistence'
+      summary: 'DRIVER: persist availability, preserving coordinates'
   /drivers/location:
     post:
       operationId: updateLocation
@@ -303,9 +317,20 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
       security:
         - bearerAuth: []
-      summary: 'DRIVER: echo coordinates; no persistence'
+      summary: 'DRIVER: persist latest coordinates, preserving availability'
   /healthz:
     get:
       operationId: locationHealth
@@ -412,9 +437,20 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
       security:
         - internalToken: []
-      summary: 'Matching -> Location: fixed single driver, ignores coordinates and availability'
+      summary: Find available drivers with recorded coordinates within radius; Haversine distance, nearest first
   /readyz:
     get:
       operationId: locationReady
@@ -441,7 +477,13 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ready'
+          description: PostgreSQL schema unavailable
       security: []
-      summary: Stateless service readiness
+      summary: Readiness checks required PostgreSQL tables; Ride may report degraded when only Redis fails
 servers:
   - url: http://localhost:8082

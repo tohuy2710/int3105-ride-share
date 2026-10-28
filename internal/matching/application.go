@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"int3105-ride-share/internal/contracts"
+	"int3105-ride-share/internal/platform/fault"
 )
 
-// Application is the real, transport-independent implementation. It does not
-// implement the old Service interface, whose input cannot express a pickup.
+// Application implements persistent matching using transport-independent ports.
 type Application struct {
 	repository MatchingRepository
 	rides      RideReader
@@ -130,7 +130,7 @@ func (a *Application) Get(ctx context.Context, rideID string) (Result, error) {
 
 func (a *Application) readRide(ctx context.Context, rideID string) (contracts.Ride, error) {
 	ride, err := a.rides.GetRide(ctx, rideID)
-	if errors.Is(err, ErrRideNotFound) {
+	if errors.Is(err, ErrRideNotFound) || errors.Is(err, fault.NotFound) {
 		return contracts.Ride{}, ErrRideNotFound
 	}
 	if err != nil {

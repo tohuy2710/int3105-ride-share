@@ -67,8 +67,17 @@ components:
           minLength: 1
           pattern: \S
           type: string
+        pickupLocation:
+          $ref: '#/components/schemas/Coordinates'
+        radiusMeters:
+          default: 3000
+          description: Positive search radius in meters; null is invalid
+          exclusiveMinimum: true
+          minimum: 0
+          type: number
       required:
         - fareId
+        - pickupLocation
       type: object
     DetailsResponse:
       additionalProperties: false
@@ -125,6 +134,9 @@ components:
                 - INTERNAL_ERROR
                 - NOT_FOUND
                 - METHOD_NOT_ALLOWED
+                - MATCHING_NOT_FOUND
+                - MATCHING_REQUEST_CONFLICT
+                - NOTIFICATION_NOT_FOUND
               type: string
             details:
               items:
@@ -266,9 +278,9 @@ components:
       name: X-Internal-Token
       type: apiKey
 info:
-  description: Phase 1. JSON <= 1 MiB. Unknown input fields are ignored for compatibility. IDs are nonblank strings. Public routes use JWT; internal routes use X-Internal-Token. Only Ride persists data; Auth uses fixtures. No inter-service HTTP or AMQP wiring.
+  description: JSON <= 1 MiB. Unknown input fields are ignored. Public routes use JWT; internal routes use X-Internal-Token. Ride, Location, Matching and Notification persist in PostgreSQL; inter-service calls use authenticated HTTP. Notification QUEUED means durably stored, not device delivery. Auth uses fixture credentials; registration and fare estimation remain mock.
   title: Ride Service API
-  version: 1.0.0
+  version: 1.1.0
 openapi: 3.0.3
 paths:
   /fare:
@@ -335,6 +347,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
@@ -408,6 +431,17 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
       security:
         - internalToken: []
       summary: Cumulative counters for this process; sum replica deltas outside timed bursts
@@ -475,7 +509,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          description: DEPENDENCY_UNAVAILABLE
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
@@ -522,21 +556,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
-          headers:
-            X-Request-ID:
-              description: Echo request ID up to 128 characters, otherwise generate a new ID
-              schema:
-                type: string
+                $ref: '#/components/schemas/Ready'
+          description: PostgreSQL schema unavailable
       security: []
-      summary: Dependency readiness; Redis unavailable is 200 degraded
+      summary: Readiness checks required PostgreSQL tables; Ride may report degraded when only Redis fails
   /rides:
     post:
       operationId: createRide
       requestBody:
         content:
           application/json:
+            example:
+              fareId: fare_123
+              pickupLocation:
+                lat: 21.0285
+                long: 105.8542
+              radiusMeters: 3000
             schema:
               $ref: '#/components/schemas/CreateRequest'
         required: true
@@ -546,7 +581,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RideResponse'
-          description: Success
+          description: Ride and matching request committed. Matching/notifications run asynchronously; this response does not acknowledge their completion.
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
@@ -601,7 +636,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          description: DEPENDENCY_UNAVAILABLE
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
@@ -609,7 +644,7 @@ paths:
                 type: string
       security:
         - bearerAuth: []
-      summary: 'RIDER: persist a new REQUESTED ride; does not call Matching'
+      summary: Persist REQUESTED ride and matching outbox atomically; background dispatch retries downstream failures
   /rides/{rideId}:
     delete:
       operationId: cancelRide
@@ -696,7 +731,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          description: DEPENDENCY_UNAVAILABLE
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
@@ -779,7 +814,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          description: DEPENDENCY_UNAVAILABLE
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
@@ -887,7 +922,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          description: DEPENDENCY_UNAVAILABLE
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
@@ -996,7 +1031,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'DEPENDENCY_UNAVAILABLE: database failed or commit outcome uncertain'
+          description: DEPENDENCY_UNAVAILABLE
           headers:
             X-Request-ID:
               description: Echo request ID up to 128 characters, otherwise generate a new ID

@@ -22,7 +22,7 @@ Khi notebook chạy root, database chạy dưới `nobody`; thư mục run cho p
 Notebook chạy theo thứ tự:
 
 1. Preflight, download/build và kiểm version.
-2. Build/test/contract Go và cài matplotlib phiên bản khóa.
+2. Build/test/contract Go và cài matplotlib phiên bản khóa trong virtualenv riêng `/kaggle/working/ride-share-python`; không thay đổi thư viện Python global của Kaggle.
 3. Native integration/fault/smoke, tự tạo và dọn dependency.
 4. Suite SQL và Redis+SQL, hai replica/mode.
 5. Hiển thị biểu đồ, lưu metadata, log, JSON/CSV và PNG/SVG.
@@ -34,6 +34,8 @@ Không đưa RabbitMQ hoặc nghiệp vụ mock vào đường đo acceptance. T
 Bấm **Save & Run All**; chỉ đánh dấu kiểm chứng Kaggle hoàn tất nếu toàn bộ notebook kết thúc thành công trong phiên mới. Giữ thư mục `/kaggle/working/ride-share-results/run-*` và notebook version. Bootstrap và native integration/race/fault/smoke đã qua trong container Linux amd64 chạy root với Go/PostgreSQL/Redis đã khóa; điều này kiểm chứng source build và quyền nobody, chưa thay thế lần thực thi trực tiếp trên tài khoản Kaggle.
 
 - Không tải được source: kiểm tra Internet và URL trong versions lock; checksum sai thì dừng, không tự bỏ kiểm tra.
+- Notebook dùng backend `Agg` cho subprocess vẽ biểu đồ, tránh kế thừa backend inline chưa cài trong venv. `wrapt` được khóa phiên bản để đáp ứng hook `sitecustomize` của Kaggle.
+- Python Kaggle thiếu `ensurepip`: notebook tạo venv bằng `--without-pip` và dùng pip có sẵn với `--python` để cài vào venv; không cần cài apt hoặc sửa Python global.
 - Build thiếu compiler hoặc quyền chạy process: preflight báo lỗi; không chuyển sang DB/mock rồi tiếp tục benchmark.
 - Port bị dùng: runner dừng và giữ log; không kill tiến trình không thuộc runner.
 - Cell bị exception: `finally` dừng các process runner sở hữu. Nếu notebook bị runtime kill hoặc dừng cưỡng bức, restart session trước khi chạy lại.

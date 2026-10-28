@@ -19,6 +19,9 @@ components:
                 - INTERNAL_ERROR
                 - NOT_FOUND
                 - METHOD_NOT_ALLOWED
+                - MATCHING_NOT_FOUND
+                - MATCHING_REQUEST_CONFLICT
+                - NOTIFICATION_NOT_FOUND
               type: string
             details:
               items:
@@ -130,9 +133,9 @@ components:
       name: X-Internal-Token
       type: apiKey
 info:
-  description: Phase 1. JSON <= 1 MiB. Unknown input fields are ignored for compatibility. IDs are nonblank strings. Public routes use JWT; internal routes use X-Internal-Token. Only Ride persists data; Auth uses fixtures. No inter-service HTTP or AMQP wiring.
+  description: JSON <= 1 MiB. Unknown input fields are ignored. Public routes use JWT; internal routes use X-Internal-Token. Ride, Location, Matching and Notification persist in PostgreSQL; inter-service calls use authenticated HTTP. Notification QUEUED means durably stored, not device delivery. Auth uses fixture credentials; registration and fare estimation remain mock.
   title: Notification Service API
-  version: 1.0.0
+  version: 1.1.0
 openapi: 3.0.3
 paths:
   /healthz:
@@ -163,6 +166,87 @@ paths:
                 type: string
       security: []
       summary: Process liveness; does not inspect dependencies
+  /internal/notifications/{notificationId}:
+    get:
+      operationId: getNotification
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+          description: Success
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'VALIDATION_ERROR: malformed or invalid input'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'UNAUTHORIZED: missing, invalid or expired credentials'
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: NOTIFICATION_NOT_FOUND
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+      security:
+        - internalToken: []
+      summary: Read persisted notification snapshot by ID
+    parameters:
+      - in: path
+        name: notificationId
+        required: true
+        schema:
+          minLength: 1
+          pattern: \S
+          type: string
   /internal/notifications/ride-requests:
     post:
       operationId: sendRideRequest
@@ -176,12 +260,6 @@ paths:
         "202":
           content:
             application/json:
-              example:
-                driverId: driver_456
-                notificationId: notification_123
-                rideId: ride_123
-                status: QUEUED
-                type: RIDE_REQUEST
               schema:
                 $ref: '#/components/schemas/NotificationResponse'
           description: Success
@@ -223,9 +301,20 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
       security:
         - internalToken: []
-      summary: 'Matching -> Notification: fixture QUEUED acknowledgement; no delivery'
+      summary: Durably enqueue RIDE_REQUEST; retries deduplicate by (rideId, driverId, type); no push delivery
   /readyz:
     get:
       operationId: notificationReady
@@ -252,7 +341,13 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ready'
+          description: PostgreSQL schema unavailable
       security: []
-      summary: Stateless service readiness
+      summary: Readiness checks required PostgreSQL tables; Ride may report degraded when only Redis fails
 servers:
   - url: http://localhost:8084

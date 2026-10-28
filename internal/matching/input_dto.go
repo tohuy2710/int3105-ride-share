@@ -7,8 +7,7 @@ import (
 	"int3105-ride-share/internal/contracts"
 )
 
-// InputFields is an opt-in mapping helper for the future HTTP boundary. The
-// current Request/DTO and mock endpoint deliberately do not use it yet.
+// InputFields validates the HTTP request before passing plain values to the application.
 type InputFields struct {
 	RideID         string        `json:"rideId"`
 	PickupLocation *PickupFields `json:"pickupLocation"`

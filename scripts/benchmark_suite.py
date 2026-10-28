@@ -91,7 +91,7 @@ def main():
         info['fixtureSHA256'] = hashlib.sha256(Path(env['AUTH_FIXTURES']).read_bytes()).hexdigest()
         info['benchmark'] = vars(args)
         info['durability'] = {'fsync': True, 'synchronous_commit': True, 'shared_buffers': '128MB', 'max_connections': 50}
-        info['limitations'] = ['Load generator and backend share hardware.', 'RSS sums can count shared pages more than once.', 'No inter-service HTTP or AMQP wiring.']
+        info['limitations'] = ['Load generator and backend share hardware.', 'RSS sums can count shared pages more than once.', 'Core-only acceptance run: Matching/Location/Notification are not started; outbox work is deferred or skipped after acceptance. No AMQP delivery.']
         (directory / 'environment.json').write_text(json.dumps(info, indent=2) + '\n')
         # Alternate order across suite invocations if investigating order effects.
         for mode in ('sql', 'redis_sql'):

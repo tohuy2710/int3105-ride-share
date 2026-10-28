@@ -22,7 +22,9 @@ type Ride struct {
 }
 
 type MatchingRequest struct {
-	RideID string `json:"rideId"`
+	RideID         string      `json:"rideId"`
+	PickupLocation Coordinates `json:"pickupLocation"`
+	RadiusMeters   float64     `json:"radiusMeters"`
 }
 type MatchingResponse struct {
 	RideID string `json:"rideId"`

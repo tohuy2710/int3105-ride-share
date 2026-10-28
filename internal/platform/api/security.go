@@ -66,9 +66,11 @@ func ServiceError(c *gin.Context, err error) {
 		status = 401
 	case "FORBIDDEN":
 		status = 403
-	case "RIDE_NOT_FOUND":
+	case "VALIDATION_ERROR":
+		status = 400
+	case "RIDE_NOT_FOUND", "MATCHING_NOT_FOUND", "NOTIFICATION_NOT_FOUND":
 		status = 404
-	case "INVALID_RIDE_STATE", "RIDE_ALREADY_ACCEPTED", "ACCEPT_IN_PROGRESS":
+	case "MATCHING_REQUEST_CONFLICT", "INVALID_RIDE_STATE", "RIDE_ALREADY_ACCEPTED", "ACCEPT_IN_PROGRESS":
 		status = 409
 	case "DEPENDENCY_UNAVAILABLE":
 		status = 503

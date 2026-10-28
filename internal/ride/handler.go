@@ -28,7 +28,11 @@ func (h *Handler) CreateRide(c *gin.Context) {
 	if !api.BindJSON(c, &input) {
 		return
 	}
-	result, err := h.service.CreateRide(c.Request.Context(), c.GetString("riderId"), input.FareID)
+	radius := 3000.0
+	if input.RadiusMeters != nil {
+		radius = *input.RadiusMeters
+	}
+	result, err := h.service.CreateRideWithMatching(c.Request.Context(), c.GetString("riderId"), input.FareID, contracts.MatchingRequest{PickupLocation: contracts.Coordinates{Lat: *input.PickupLocation.Lat, Long: *input.PickupLocation.Long}, RadiusMeters: radius})
 	if err != nil {
 		api.ServiceError(c, err)
 		return

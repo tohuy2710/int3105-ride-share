@@ -39,7 +39,7 @@ func TestOpenAPIAndActualResponses(t *testing.T) {
 		status                            int
 	}{
 		{"ride", "POST", "/fare", `{"pickupLocation":{"lat":0,"long":0},"destination":{"lat":90,"long":180}}`, "RIDER", 200},
-		{"ride", "POST", "/rides", `{"fareId":"fare_123"}`, "RIDER", 201},
+		{"ride", "POST", "/rides", `{"fareId":"fare_123","pickupLocation":{"lat":0,"long":0}}`, "RIDER", 201},
 		{"ride", "GET", "/rides/ride_123", "", "RIDER", 200},
 		{"ride", "PATCH", "/rides/ride_123", `{"action":"ACCEPT"}`, "DRIVER", 200},
 		{"ride", "PATCH", "/rides/ride_123", `{"action":"DENY"}`, "DRIVER", 200},
@@ -49,9 +49,10 @@ func TestOpenAPIAndActualResponses(t *testing.T) {
 		{"location", "POST", "/drivers/location", `{"lat":0,"long":0}`, "DRIVER", 200},
 		{"location", "PATCH", "/drivers/availability", `{"available":false}`, "DRIVER", 200},
 		{"location", "GET", "/internal/drivers/nearby?lat=0&long=0", "", "internal", 200},
-		{"matching", "POST", "/internal/matching/requests", `{"rideId":"ride_123"}`, "internal", 202},
+		{"matching", "POST", "/internal/matching/requests", `{"rideId":"ride_123","pickupLocation":{"lat":0,"long":0}}`, "internal", 202},
 		{"matching", "GET", "/internal/matching/requests/ride_123", "", "internal", 200},
 		{"notification", "POST", "/internal/notifications/ride-requests", `{"rideId":"ride_123","driverId":"driver_456","type":"RIDE_REQUEST"}`, "internal", 202},
+		{"notification", "GET", "/internal/notifications/notification_123", "", "internal", 200},
 		{"auth", "POST", "/auth/register", `{"email":"new@example.com","password":"RideShare123!","role":"RIDER"}`, "", 201},
 		{"auth", "POST", "/auth/login", `{"email":"driver1@example.com","password":"RideShare123!"}`, "", 200},
 		{"auth", "GET", "/auth/me", "", "DRIVER", 200},

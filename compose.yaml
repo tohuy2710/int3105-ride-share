@@ -101,6 +101,10 @@ services:
     environment:
       <<: *app-env
       PORT: "8082"
+      DATABASE_URL: postgres://ride:ride_local@postgres:5432/rides?sslmode=disable
+      DB_TIMEOUT: ${DB_TIMEOUT:-2s}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8082/readyz"]
       interval: 5s
@@ -118,6 +122,10 @@ services:
     environment:
       <<: *app-env
       PORT: "8083"
+      DATABASE_URL: postgres://ride:ride_local@postgres:5432/rides?sslmode=disable
+      DB_TIMEOUT: ${DB_TIMEOUT:-2s}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8083/readyz"]
       interval: 5s
@@ -135,6 +143,10 @@ services:
     environment:
       <<: *app-env
       PORT: "8084"
+      DATABASE_URL: postgres://ride:ride_local@postgres:5432/rides?sslmode=disable
+      DB_TIMEOUT: ${DB_TIMEOUT:-2s}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8084/readyz"]
       interval: 5s

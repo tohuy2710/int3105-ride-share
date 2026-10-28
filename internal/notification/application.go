@@ -32,8 +32,7 @@ var (
 	ErrValidation = fault.New("VALIDATION_ERROR", "Invalid notification request")
 )
 
-// Application is the real Notification implementation. It satisfies Service, so the
-// existing router can serve it once the integrator wires it; the default runtime stays mock.
+// Application stores and reads deduplicated notification requests.
 type Application struct {
 	Repo      Repository
 	DBTimeout time.Duration

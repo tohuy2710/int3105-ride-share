@@ -13,6 +13,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer rt.Close()
+	if err := rt.StartDispatcher(); err != nil {
+		log.Fatal(err)
+	}
 	if err := app.Run("ride-service", "8081", func(r *gin.Engine) { rt.Register(r) }); err != nil {
 		log.Fatal(err)
 	}

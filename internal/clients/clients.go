@@ -1,5 +1,4 @@
-// Package clients defines service ports and deterministic development stubs.
-// No method performs HTTP or AMQP I/O in phase 1.
+// Package clients defines service ports, HTTP adapters and isolated test stubs.
 package clients
 
 import (

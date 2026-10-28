@@ -79,7 +79,7 @@ func TestEndpoints(t *testing.T) {
 		want                        string
 	}{
 		{"ride", "POST", "/fare", `{"pickupLocation":{"lat":0,"long":0},"destination":{"lat":90,"long":180}}`, 200, `{"fareId":"fare_123","estimatedFare":85000,"etaMinutes":12}`},
-		{"ride", "POST", "/rides", `{"fareId":"any-fare"}`, 201, `{"rideId":"ride_123","status":"REQUESTED"}`},
+		{"ride", "POST", "/rides", `{"fareId":"any-fare","pickupLocation":{"lat":0,"long":0}}`, 201, `{"rideId":"ride_123","status":"REQUESTED"}`},
 		{"ride", "GET", "/rides/custom", "", 200, `{"rideId":"custom","fareId":"fare_123","riderId":"rider_123","driverId":null,"status":"REQUESTED"}`},
 		{"ride", "PATCH", "/rides/custom", `{"action":"ACCEPT"}`, 200, `{"rideId":"custom","action":"ACCEPT","driverId":"driver_456","status":"ACCEPTED"}`},
 		{"ride", "PATCH", "/rides/custom", `{"action":"DENY"}`, 200, `{"rideId":"custom","action":"DENY","driverId":null,"status":"REQUESTED"}`},
@@ -87,7 +87,7 @@ func TestEndpoints(t *testing.T) {
 		{"location", "POST", "/drivers/location", `{"lat":0,"long":0}`, 200, `{"driverId":"driver_456","lat":0,"long":0}`},
 		{"location", "PATCH", "/drivers/availability", `{"available":false}`, 200, `{"driverId":"driver_456","available":false}`},
 		{"location", "GET", "/internal/drivers/nearby?lat=0&long=0", "", 200, `{"drivers":[{"driverId":"driver_456","location":{"lat":21.0285,"long":105.8542},"distanceMeters":500}]}`},
-		{"matching", "POST", "/internal/matching/requests", `{"rideId":"custom"}`, 202, `{"rideId":"custom","status":"MATCHING"}`},
+		{"matching", "POST", "/internal/matching/requests", `{"rideId":"custom","pickupLocation":{"lat":0,"long":0}}`, 202, `{"rideId":"custom","status":"MATCHING"}`},
 		{"matching", "GET", "/internal/matching/requests/custom", "", 200, `{"rideId":"custom","status":"MATCHING"}`},
 		{"notification", "POST", "/internal/notifications/ride-requests", `{"rideId":"custom","driverId":"recipient","type":"RIDE_REQUEST"}`, 202, `{"notificationId":"notification_123","rideId":"custom","driverId":"recipient","type":"RIDE_REQUEST","status":"QUEUED"}`},
 	}
@@ -111,6 +111,13 @@ func TestValidation(t *testing.T) {
 		{"ride", "POST", "/fare", `{"pickupLocation":{"lat":0,"long":181},"destination":{"lat":0,"long":0}}`},
 		{"ride", "POST", "/fare", `{"pickupLocation":null}`},
 		{"ride", "POST", "/rides", `{`}, {"ride", "POST", "/rides", ``}, {"ride", "POST", "/rides", `null`},
+		{"ride", "POST", "/rides", `{"fareId":"f"}`},
+		{"ride", "POST", "/rides", `{"fareId":"f","pickupLocation":{"lat":0}}`},
+		{"ride", "POST", "/rides", `{"fareId":"f","pickupLocation":{"lat":0,"long":0},"radiusMeters":0}`},
+		{"ride", "POST", "/rides", `{"fareId":"f","pickupLocation":{"lat":0,"long":0},"radiusMeters":null}`},
+		{"matching", "POST", "/internal/matching/requests", `{"rideId":"r"}`},
+		{"matching", "POST", "/internal/matching/requests", `{"rideId":"r","pickupLocation":{"lat":0,"long":0},"radiusMeters":0}`},
+		{"matching", "POST", "/internal/matching/requests", `{"rideId":"r","pickupLocation":{"lat":0,"long":0},"radiusMeters":null}`},
 		{"ride", "POST", "/rides", `{}`}, {"ride", "POST", "/rides", `{"fareId":"   "}`},
 		{"ride", "POST", "/rides", `{"fareId":123}`}, {"ride", "POST", "/rides", `{"fareId":"f"} {}`},
 		{"ride", "PATCH", "/rides/custom", `{"action":"UNKNOWN"}`},

@@ -112,7 +112,7 @@ func (h *harness) login(email string) (string, string, error) {
 	return out.AccessToken, out.User.UserID, nil
 }
 func (h *harness) create() (string, error) {
-	status, data, err := h.call("POST", h.urls[0]+"/rides", h.rider, map[string]string{"fareId": "fare_123"})
+	status, data, err := h.call("POST", h.urls[0]+"/rides", h.rider, map[string]any{"fareId": "fare_123", "pickupLocation": contracts.Coordinates{Lat: 0, Long: 0}})
 	if err != nil {
 		return "", err
 	}

@@ -1,5 +1,22 @@
 components:
   schemas:
+    Coordinates:
+      additionalProperties: true
+      properties:
+        lat:
+          format: double
+          maximum: 90
+          minimum: -90
+          type: number
+        long:
+          format: double
+          maximum: 180
+          minimum: -180
+          type: number
+      required:
+        - lat
+        - long
+      type: object
     ErrorResponse:
       additionalProperties: false
       properties:
@@ -19,6 +36,9 @@ components:
                 - INTERNAL_ERROR
                 - NOT_FOUND
                 - METHOD_NOT_ALLOWED
+                - MATCHING_NOT_FOUND
+                - MATCHING_REQUEST_CONFLICT
+                - NOTIFICATION_NOT_FOUND
               type: string
             details:
               items:
@@ -52,12 +72,21 @@ components:
     MatchingRequest:
       additionalProperties: true
       properties:
+        pickupLocation:
+          $ref: '#/components/schemas/Coordinates'
+        radiusMeters:
+          default: 3000
+          description: Positive search radius in meters; null is invalid
+          exclusiveMinimum: true
+          minimum: 0
+          type: number
         rideId:
           minLength: 1
           pattern: \S
           type: string
       required:
         - rideId
+        - pickupLocation
       type: object
     MatchingResponse:
       additionalProperties: false
@@ -69,6 +98,9 @@ components:
         status:
           enum:
             - MATCHING
+            - NO_DRIVERS
+            - MATCHED
+            - CANCELLED
           type: string
       required:
         - rideId
@@ -105,9 +137,9 @@ components:
       name: X-Internal-Token
       type: apiKey
 info:
-  description: Phase 1. JSON <= 1 MiB. Unknown input fields are ignored for compatibility. IDs are nonblank strings. Public routes use JWT; internal routes use X-Internal-Token. Only Ride persists data; Auth uses fixtures. No inter-service HTTP or AMQP wiring.
+  description: JSON <= 1 MiB. Unknown input fields are ignored. Public routes use JWT; internal routes use X-Internal-Token. Ride, Location, Matching and Notification persist in PostgreSQL; inter-service calls use authenticated HTTP. Notification QUEUED means durably stored, not device delivery. Auth uses fixture credentials; registration and fare estimation remain mock.
   title: Matching Service API
-  version: 1.0.0
+  version: 1.1.0
 openapi: 3.0.3
 paths:
   /healthz:
@@ -184,6 +216,28 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: RIDE_NOT_FOUND
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: MATCHING_REQUEST_CONFLICT or INVALID_RIDE_STATE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
         "500":
           content:
             application/json:
@@ -195,9 +249,20 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
       security:
         - internalToken: []
-      summary: 'Ride -> Matching: fixture acknowledgement only; no worker or queue'
+      summary: Persist matching job; find nearby available drivers and durably queue one notification per candidate
   /internal/matching/requests/{rideId}:
     get:
       operationId: getMatching
@@ -235,6 +300,17 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: MATCHING_NOT_FOUND or RIDE_NOT_FOUND
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
         "500":
           content:
             application/json:
@@ -246,9 +322,20 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: DEPENDENCY_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              description: Echo request ID up to 128 characters, otherwise generate a new ID
+              schema:
+                type: string
       security:
         - internalToken: []
-      summary: Always MATCHING; independent from persisted Ride state
+      summary: Read matching job and reconcile status with Ride; terminal matching statuses never regress
     parameters:
       - in: path
         name: rideId
@@ -283,7 +370,13 @@ paths:
               description: Echo request ID up to 128 characters, otherwise generate a new ID
               schema:
                 type: string
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ready'
+          description: PostgreSQL schema unavailable
       security: []
-      summary: Stateless service readiness
+      summary: Readiness checks required PostgreSQL tables; Ride may report degraded when only Redis fails
 servers:
   - url: http://localhost:8083

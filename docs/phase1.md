@@ -15,7 +15,7 @@ Nguồn đề bài: `work/de_bai.md` trong workspace của nhóm.
 | GitHub công khai, commit cẩn thận | Repo đã cấu hình origin; public visibility và push/commit do nhóm quản lý, chưa thay đổi từ phiên triển khai này |
 | Kiểm thử tải Kaggle CPU | Đã có notebook/bootstrap/load generator; còn cần Save & Run All trên tài khoản Kaggle |
 
-Auth register có chủ ý mock, không lưu tài khoản mới. Login fixture là cơ chế chạy thật cho Pha 1; không mô tả hệ thống này là quản lý tài khoản production. Location/Matching/Notification có application/repository thật đã kiểm thử nhưng HTTP runtime vẫn mock; RabbitMQ chỉ có topology. Luồng nhận cuốc không phát event và không tự đồng bộ Matching.
+Auth register có chủ ý mock, không lưu tài khoản mới. Login fixture là cơ chế chạy thật cho Pha 1; không mô tả hệ thống này là quản lý tài khoản production. Location/Matching/Notification chạy HTTP + repository thật; tạo cuốc kích hoạt matching qua outbox bền. GET Matching đối chiếu trạng thái Ride. RabbitMQ chỉ có topology; ACCEPT chưa phát event và notification chưa gửi push.
 
 ## Tiền đề Pha 2
 

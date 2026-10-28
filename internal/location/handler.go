@@ -1,9 +1,11 @@
 package location
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"int3105-ride-share/internal/contracts"
 	"int3105-ride-share/internal/platform/api"
+	"int3105-ride-share/internal/platform/fault"
 )
 
 type Handler struct{ service Service }
@@ -15,7 +17,13 @@ func (h *Handler) UpdateLocation(c *gin.Context) {
 	}
 	result, err := h.service.UpdateLocation(c.Request.Context(), c.GetString("driverId"), contracts.Coordinates{Lat: *input.Lat, Long: *input.Long})
 	if err != nil {
-		api.Fail(c, 500, "INTERNAL_ERROR", "Internal server error")
+		if errors.Is(err, ErrValidation) {
+			err = fault.New("VALIDATION_ERROR", "Invalid location input")
+		}
+		if errors.Is(err, ErrDependencyUnavailable) {
+			err = fault.Unavailable
+		}
+		api.ServiceError(c, err)
 		return
 	}
 	c.JSON(200, result)
@@ -27,7 +35,13 @@ func (h *Handler) UpdateAvailability(c *gin.Context) {
 	}
 	result, err := h.service.UpdateAvailability(c.Request.Context(), c.GetString("driverId"), *input.Available)
 	if err != nil {
-		api.Fail(c, 500, "INTERNAL_ERROR", "Internal server error")
+		if errors.Is(err, ErrValidation) {
+			err = fault.New("VALIDATION_ERROR", "Invalid location input")
+		}
+		if errors.Is(err, ErrDependencyUnavailable) {
+			err = fault.Unavailable
+		}
+		api.ServiceError(c, err)
 		return
 	}
 	c.JSON(200, result)
@@ -39,7 +53,13 @@ func (h *Handler) NearbyDrivers(c *gin.Context) {
 	}
 	result, err := h.service.NearbyDrivers(c.Request.Context(), contracts.NearbyInput{Lat: *input.Lat, Long: *input.Long, RadiusMeters: input.RadiusMeters})
 	if err != nil {
-		api.Fail(c, 500, "INTERNAL_ERROR", "Internal server error")
+		if errors.Is(err, ErrValidation) {
+			err = fault.New("VALIDATION_ERROR", "Invalid location input")
+		}
+		if errors.Is(err, ErrDependencyUnavailable) {
+			err = fault.Unavailable
+		}
+		api.ServiceError(c, err)
 		return
 	}
 	c.JSON(200, result)

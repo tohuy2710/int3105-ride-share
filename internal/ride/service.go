@@ -13,6 +13,7 @@ type FareInput struct{ PickupLocation, Destination contracts.Coordinates }
 type Service interface {
 	EstimateFare(context.Context, string, FareInput) (FareResponse, error)
 	CreateRide(context.Context, string, string) (RideResponse, error)
+	CreateRideWithMatching(context.Context, string, string, contracts.MatchingRequest) (RideResponse, error)
 	GetRide(context.Context, string, contracts.User) (DetailsResponse, error)
 	InternalRide(context.Context, string) (DetailsResponse, error)
 	RespondToRide(context.Context, string, string, string) (ActionResponse, error)

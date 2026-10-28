@@ -34,7 +34,10 @@ try:
         subprocess.run(['go', 'test', '-race', '-tags=integration',
                         './internal/' + service + '/...', '-count=1', '-v'], cwd=ROOT, env=env, check=True)
     subprocess.run(['go', 'test', '-race', '-tags=integration', './internal/integration', '-count=1', '-v'], cwd=ROOT, env=env, check=True)
-    for name, port in [('ride', 18081), ('location', 18082), ('matching', 18083), ('notification', 18084), ('auth', 18085)]:
+    services = [('ride', 18081), ('location', 18082), ('matching', 18083), ('notification', 18084), ('auth', 18085)]
+    for name, port in services:
+        env[name.upper() + '_URL'] = f'http://127.0.0.1:{port}'
+    for name, port in services:
         child = env.copy()
         child['PORT'] = str(port)
         env[name.upper() + '_URL'] = f'http://127.0.0.1:{port}'

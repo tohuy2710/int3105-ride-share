@@ -19,11 +19,13 @@ import (
 )
 
 type Runtime struct {
-	DB      *sql.DB
-	Redis   *redis.Client
-	App     *ride.Application
-	Metrics *metrics.Counters
-	Mode    string
+	DB           *sql.DB
+	Redis        *redis.Client
+	App          *ride.Application
+	Metrics      *metrics.Counters
+	Mode         string
+	stopDispatch context.CancelFunc
+	dispatchDone chan struct{}
 }
 
 func New() (*Runtime, error) {
@@ -67,6 +69,10 @@ func New() (*Runtime, error) {
 	return rt, nil
 }
 func (rt *Runtime) Close() {
+	if rt.stopDispatch != nil {
+		rt.stopDispatch()
+		<-rt.dispatchDone
+	}
 	rt.DB.Close()
 	if rt.Redis != nil {
 		rt.Redis.Close()
@@ -79,7 +85,7 @@ func (rt *Runtime) Register(r *gin.Engine) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), rt.App.DBTimeout)
 		defer cancel()
 		var exists bool
-		err := rt.DB.QueryRowContext(ctx, "SELECT to_regclass('ride.rides') IS NOT NULL").Scan(&exists)
+		err := rt.DB.QueryRowContext(ctx, "SELECT to_regclass('ride.rides') IS NOT NULL AND to_regclass('ride.matching_dispatch') IS NOT NULL").Scan(&exists)
 		if err != nil || !exists {
 			c.JSON(503, gin.H{"status": "unavailable", "postgres": "unavailable"})
 			return
