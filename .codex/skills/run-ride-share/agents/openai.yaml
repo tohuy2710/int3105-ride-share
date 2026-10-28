@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Ride Share"
+  short_description: "Start Ride Share and verify APIs and Swagger"
+  default_prompt: "Use $run-ride-share to start this project locally and verify its services and Swagger UI."
